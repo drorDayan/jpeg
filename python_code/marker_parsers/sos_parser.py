@@ -4,7 +4,7 @@ class SosParser(IParser):
     def parse(self, jpg, raw_marker):
         if raw_marker[0] < 1 or raw_marker[0] > 4:
             raise Exception("Illegal number of components in SOS")
-        jpg._num_components = raw_marker[0]
+        jpg._num_components = raw_marker[0]  ############################################
 
         idx = 1
         for comp_id in range(jpg._num_components):

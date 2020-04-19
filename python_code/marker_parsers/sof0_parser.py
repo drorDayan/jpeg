@@ -12,7 +12,6 @@ class Sof0Parser(IParser):
 
     def parse(self, jpg, raw_marker):
         debug_print("Sof0 parser started")
-        print(len(raw_marker))
 
         assert raw_marker[Sof0Parser.precision_idx] == 8, "precision should be 8"
 
