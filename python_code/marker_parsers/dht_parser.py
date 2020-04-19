@@ -21,6 +21,11 @@ class HuffTree:
     def set_value(self, value):
         self._value = value
 
+    def get_value(self):
+        return self._value
+
+    def is_leaf(self):
+        return len(self._successors) == 0
 
 class HuffTable:
     def __init__(self, table_num, is_dc, tree):
