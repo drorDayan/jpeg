@@ -1,8 +1,8 @@
-from python_code.marker_parsers.Sof0Parser import Sof0Parser
-from python_code.marker_parsers.dht_parser import DhtParser
-from python_code.marker_parsers.dqt_parser import DqtParser
-from python_code.marker_parsers.eoi_parser import EoiParser
-from python_code.marker_parsers.sos_parser import SosParser
+from marker_parsers.Sof0Parser import Sof0Parser
+from marker_parsers.dht_parser import DhtParser
+from marker_parsers.dqt_parser import DqtParser
+from marker_parsers.eoi_parser import EoiParser
+from marker_parsers.sos_parser import SosParser
 
 
 class Jpeg:

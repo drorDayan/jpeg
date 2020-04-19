@@ -1,4 +1,4 @@
-from python_code.marker_parsers.i_parser import IParser
+from marker_parsers.i_parser import IParser
 
 
 class Sof0Parser(IParser):
