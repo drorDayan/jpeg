@@ -4,10 +4,11 @@ class SosParser(IParser):
     def parse(self, jpg, raw_marker):
         if raw_marker[0] < 1 or raw_marker[0] > 4:
             raise Exception("Illegal number of components in SOS")
-        jpg._num_components = raw_marker[0]  ############################################
+        num_components = raw_marker[0]
+        assert num_components == 3, "Num components must be 3"
 
         idx = 1
-        for comp_id in range(jpg._num_components):
+        for comp_id in range(3):
             comp_id = raw_marker[idx]
             ac_table = raw_marker[idx + 1] & 0x0F
             dc_table = (raw_marker[idx + 1] & 0xF0) >> 4

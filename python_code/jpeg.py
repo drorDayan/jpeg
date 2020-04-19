@@ -7,7 +7,8 @@ from marker_parsers.sos_parser import SosParser
 
 class Jpeg:
     def __init__(self, jpeg_file_path):
-        self._huffman_tables = {}
+        self._ac_huffman_tables = {}
+        self._dc_huffman_tables = {}
         self._quantization_tables = {}
         self._component_id_to_quantization_table_id = {}
         self._component_id_to_huffman_tables_ids = {}
@@ -71,10 +72,11 @@ class Jpeg:
     def add_huffman_table(self, huff_table):
         table_id = huff_table.get_table_id()
         is_dc = huff_table.get_is_dc()
-        if table_id in self._huffman_tables.keys():
+        huffman_tables = self._dc_huffman_tables if is_dc else self._ac_huffman_tables
+        if table_id in huffman_tables.keys():
             raise Exception("error quantization table with this id exists")
 
-        self._huffman_tables[(table_id, is_dc)] = huff_table
+        huffman_tables[table_id] = huff_table
 
     def add_quantization_table(self, table_id, quantization_table_to_add):
         if table_id in self._quantization_tables:
@@ -114,8 +116,8 @@ class Jpeg:
     and the tables might be defined afterwards'''
     def finalize_metadata(self):
         for comp_id in self._component_id_to_quantization_table_id.keys():
-            ac_t = self._huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][0], False]
-            dc_t = self._huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][1], True]
+            ac_t = self._ac_huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][0]]
+            dc_t = self._dc_huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][1]]
             q_t = self._quantization_tables[self._component_id_to_quantization_table_id[comp_id]]
             horizontal_sample_factor, vertical_sample_factor = self._component_id_to_sample_factors[comp_id]
             self._components[comp_id] = Jpeg.ComponentMetadata(
