@@ -12,6 +12,9 @@ class Jpeg:
         self._quantization_tables = {}
         self._height = None
         self._width = None
+        self._component_id_to_quantization_table_id = {}
+        self._component_id_to_sample_factors = {}
+
         self._exists_eoi = False
 
         jpeg_file = open(jpeg_file_path, 'rb')
@@ -70,3 +73,17 @@ class Jpeg:
     def set_height_and_width(self, height, width):
         self._height = height
         self._width = width
+
+    def add_component_quantization_table(self, component_id, quantization_table_id):
+        if component_id in self._component_id_to_quantization_table_id:
+            print("error this component_id has a quantization_table assigned to him")
+            return False
+        self._component_id_to_quantization_table_id[component_id] = quantization_table_id
+        return True
+
+    def add_component_sample_factors(self, component_id, sample_factors):
+        if component_id in self._component_id_to_sample_factors:
+            print("error this component_id has a sample_factors assigned to him")
+            return False
+        self._component_id_to_sample_factors[component_id] = sample_factors
+        return True
