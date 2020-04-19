@@ -8,7 +8,7 @@ from marker_parsers.sos_parser import SosParser
 class Jpeg:
     def __init__(self, jpeg_file_path):
         self._mcu_list = []
-        self._huffman_table_list = []
+        self._huffman_tables = {}
         self._quantization_tables = {}
         self._height = None
         self._width = None
@@ -56,12 +56,17 @@ class Jpeg:
                     raise Exception(f"no marker of type {hex(marker_type)} implemented!")
 
                 parser = self._marker_parsers[marker_type]()
-                is_continue = parser.parse(self, self._jpg_data[idx_in_file + 4: idx_in_file + 2 + marker_size])
+                start_idx = idx_in_file + 4
+                is_continue = parser.parse(self, self._jpg_data[start_idx: start_idx + marker_size - 2])
             idx_in_file += (2 + marker_size) # This is including the size and not including the 0xYY marker (so 4-2=2).
 
-    def add_huffman_table(self, huffman_table_to_add):
-        # TODO make sure this is not a duplicate?
-        self._huffman_table_list.append(huffman_table_to_add)
+    def add_huffman_table(self, huff_table):
+        table_id = huff_table.get_table_id()
+        is_dc = huff_table.get_is_dc()
+        if table_id in self._huffman_tables.keys():
+            raise Exception("error quantization table with this id exists")
+
+        self._huffman_tables[(table_id, is_dc)] = huff_table
 
     def add_quantization_table(self, table_id, quantization_table_to_add):
         if table_id in self._quantization_tables:
