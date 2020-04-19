@@ -13,6 +13,10 @@ class Jpeg:
         self._height = None
         self._width = None
         self._component_id_to_quantization_table_id = {}
+
+        self._component_id_to_huffman_tables_ids = {}
+        self._num_components = None
+
         self._component_id_to_sample_factors = {}
 
         self._exists_eoi = False
@@ -59,6 +63,8 @@ class Jpeg:
                 start_idx = idx_in_file + 4
                 is_continue = parser.parse(self, self._jpg_data[start_idx: start_idx + marker_size - 2])
             idx_in_file += (2 + marker_size) # This is including the size and not including the 0xYY marker (so 4-2=2).
+
+        print("Parsing completed!")
 
     def add_huffman_table(self, huff_table):
         table_id = huff_table.get_table_id()
