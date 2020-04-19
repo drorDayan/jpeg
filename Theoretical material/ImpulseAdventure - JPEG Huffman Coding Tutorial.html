@@ -1,0 +1,1742 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!-- saved from url=(0063)https://www.impulseadventure.com/photo/jpeg-huffman-coding.html -->
+<html xmlns="http://www.w3.org/1999/xhtml"><!-- InstanceBegin template="/Templates/base2.dwt" codeOutsideHTMLIsLocked="false" --><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- InstanceBeginEditable name="doctitle" -->
+<title>ImpulseAdventure - JPEG Huffman Coding Tutorial</title>
+<!-- InstanceEndEditable -->
+
+<meta name="keywords" content="digital photography, workflow, electronics, robotics, equipment, photo gallery, camera, impulse adventure, calvin hass">
+<link href="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/base_default.css" rel="stylesheet" type="text/css">
+<style type="text/css">
+<!--
+	@import url("/base_layout.css");
+-->
+</style>
+<!-- InstanceBeginEditable name="head" -->
+<meta name="Keywords" content="digital photography, workflow, equipment, photo gallery, portrait, fashion, Canon 10d, camera, impulse adventure, calvin hass">
+<meta name="Description" content="">
+<!-- InstanceEndEditable -->
+</head>
+
+	
+
+<body>
+
+<div id="header" class="bg2">
+	<div id="ad1"><a href="https://www.impulseadventure.com/photo/jpeg-huffman-coding.html#"><img src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/banner_ia.gif" alt="" width="468" height="60" border="0"></a></div>
+	<div id="logo" class="bg1">
+		<p>&nbsp;</p>
+	</div>
+</div>	
+	
+<div id="mainmenu" class="bg3">
+	<ul>
+		<li><a href="https://www.impulseadventure.com/" id="mainmenu1" accesskey="1" title="" class="link1"><b>Home</b></a></li>
+		<li><a href="https://www.impulseadventure.com/photo/" id="mainmenu2" accesskey="2" title="" class="link1 vbar"><b>Digital Photography</b></a></li>
+		<li><a href="https://www.impulseadventure.com/gallery/" id="mainmenu3" accesskey="3" title="" class="link1 vbar"><b>Photo Gallery</b></a></li>
+		<li><a href="https://www.impulseadventure.com/elec/" id="mainmenu4" accesskey="4" title="" class="link1 vbar"><b>Robotics</b></a></li>
+		<li><a href="https://www.impulseadventure.com/weights/" id="mainmenu5" accesskey="5" title="" class="link1 vbar"><b>Bodybuilding</b></a></li>
+		<li><a href="https://www.impulseadventure.com/freedive/" id="mainmenu6" accesskey="6" title="" class="link1 vbar"><b>Freediving</b></a></li>
+		<li><a href="https://www.impulseadventure.com/heli/" id="mainmenu7" accesskey="7" title="" class="link1 vbar"><b>RC Heli</b></a></li>
+	</ul>
+
+</div>
+	
+<div id="content" class="bg11">
+	<div class="bg12">
+		<div class="margined">
+			<div id="box6">
+				
+<script async="" src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/f.txt"></script>
+<!-- FreshResp -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-2529752145788811" data-ad-slot="2429524366" data-ad-format="auto"></ins>
+<script>
+(adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+		<a href="https://www.impulseadventure.com/photo/"><p class="more2">Return to Digital Photography Articles</p></a>
+				<!-- InstanceBeginEditable name="PageHeader" -->
+				<!-- InstanceEndEditable -->
+
+			  <!-- InstanceBeginEditable name="MainBody" -->
+			  <div class="title">
+					<h1 id="title4">JPEG Huffman Coding Tutorial</h1>
+					<p>After quantization, huffman / entropy coding is one of the more
+					significant contributors to the file size savings in JPEG compression.
+					This page provides a tutorial on how the huffman coding works
+					in a JPEG image. If you have ever wondered how JPEG compression works, this may provide you with some detailed insight. </p>
+			  </div>
+				<div class="content">
+				<h2>Why I wrote this tutorial</h2>
+				<p>In attempting to understand the inner workings of <a href="https://www.impulseadventure.com/photo/jpeg-compression.html">JPEG compression</a>, I
+				was unable to find any real details on the net for how Huffman coding
+				is used in the context of JPEG image compression. There are many
+				sites that describe the generic huffman coding scheme, but none that
+				describe how it will appear in a JPEG image, after factoring in the
+				DHT tables, interleaved <a href="https://www.impulseadventure.com/photo/chroma-subsampling.html">chroma subsampling</a> components, etc. While it is relatively easy to understand the JPEG marker extraction, the Start of Scan data segment is the least understood and most important part of the image data. Therefore, I
+				decided to create a page to walk through a decompression example. Hopefully others will find this useful! </p>
+				<p>The relevant sections in the JPEG Standard are quite obscure -- enough
+				so that I set out to analyze several JPEG images to reverse-engineer
+				how the huffman coding was being applied in a JPEG JFIF file.</p>
+				<h3>Latest Update:</h3>
+				<p>
+				<span class="value">[09/22/2009]</span>: Corrected Table 5 (added entry for DC 00 code).<br>
+				<span class="value">[09/19/2008]</span>: Corrected Table 1 (added entry for codes of length 9 bits).<br>
+				<span class="value">[12/03/2007]</span>: Corrected typo in text near Table 5 (code 00101). Added <a href="https://www.impulseadventure.com/photo/jpeg-snoop.html">JPEGsnoop</a> output (at end of Tutorial).<br>
+				<span class="value">[01/27/2007]</span>: Added section describing how to expand DHT into bit strings.</p>
+				<h2>The Goal</h2>
+				<p>The goal of this tutorial is to take a simple JPEG image and try to decode
+				the compressed image data by hand, learning how the Huffman compression
+				scheme works in the process.</p>
+				<h2>Simplest JPEG Example</h2>
+				<p>Most digital photos are full-color natural/organic images, which means that
+				all three image components (one luminance and two color channels) will all have
+				both low and high-frequency content. In addition, nearly all digital
+				photos use chroma subsampling, which makes the extraction process a little
+				more complicated. For the purposes of showing the basic huffman extraction,
+				we will start with the simplest of all JPEG images:</p>
+				<ul>
+				<li><strong>Grayscale</strong> - no content in the two color channels</li>
+				<li><strong>Solid color</strong> in each MCU - By making all pixels in an 8x8 block
+				the same color, there will be no AC components.</li>
+				<li><strong>No chroma subsampling</strong> - Makes scan data extraction simpler: Y, Cb, Cr, Y, Cb, Cr, etc.</li>
+				<li><strong>Small Image</strong> - Total image size is 16x8 = two <a href="https://www.impulseadventure.com/photo/jpeg-minimum-coded-unit.html">MCU</a>s or blocks. This makes the extraction in this tutorial shorter.</li>
+				</ul>
+				<h3>Creating the Image</h3>
+				<p>For the purposes of this tutorial, my working image will simply be a 16x8 pixel image, with two solid color blocks: one black and the other white. Note that each block is 8x8 pixels in size. The actual image is here: <img src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/huff_simple0.jpg">. If you want to download it, right-click and select <span class="value">Save Picture As...</span></p>
+				
+				<p>Creating the sample image was trivial, working at 1600% view. Important that dimensions and any changes in the content are on 8-pixel boundaries. Overall image dimensions should be a multiple of 8 pixels as well, in both directions. The image below is a magnified version with a grid overlayed.</p>
+				<img src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/huff_enlarged.gif">
+				<p>Once the image was created, it was saved with <span class="product">Photoshop CS2</span>'s <span class="value">Save for Web...</span> command.
+				This kept the file size down as it discards other extraneous file information (metadata, etc.)
+				that is not relevant to this tutorial. Some other important points:</p>
+				<ul class="ul1">
+				<li>Use <strong>Save for Web</strong> - Reduces total file content to minimal subset.</li>
+				<li>Use <strong>Quality level 51+</strong> - This ensures that there is no chroma subsampling
+				enabled in the JPEG encoding process, according to the way that <a href="https://www.impulseadventure.com/photo/save-as-save-for-web.html">Photoshop Save for Web</a>
+				operates. I used <strong>quality 80</strong> for this example.</li>
+				<li>Turn <strong>Optimized Off</strong> - For the purposes of this example, I think it is important
+				to work with realistic huffman tables, not degenerate single-entry tables. Therefore
+				I recommend that <a href="https://www.impulseadventure.com/photo/optimized-jpeg.html">JPEG Huffman Table Optimization</a> is left off.</li>
+				<li>Other settings: Blur off, Progressive off, ICC profile off. </li>
+				</ul>
+				<h3>Grayscale Photoshop Images</h3>
+				<p>It should be noted that when you save a JPEG image from within Photoshop it
+				always contains three components (Y, Cb, Cr). If you change the mode to grayscale (via <span class="value">Mode-&gt;Grayscale</span>), the three components are still saved, even though the JPEG standard supports an image with only one component (which would be assumed to be grayscale).</p>
+				<h2>What is Huffman Coding / Entropy Coding?</h2>
+				<p>Huffman coding is a method that takes symbols (e.g. bytes, DCT coefficients, etc.) and encodes them with variable length codes that are assigned according to statistical probabilities. A frequently-used symbol will be encoded with a code that takes up only a couple bits, while symbols that are rarely used are represented by symbols that take more bits to encode.</p>
+				<p>A JPEG file contains up to 4 huffman tables that define the mapping between these variable-length codes (which take between 1 and 16 bits) and the code values (which is an 8-bit byte). Creating these tables generally involves counting how frequently each symbol (DCT code word) appears in an image, and allocating the bit strings accordingly. But, most JPEG encoders simply use the huffman tables presented in the JPEG standard. Some encoders allow one to optimize these tables, which means that an optimal binary tree is created which allows a more efficient huffman table to be generated. </p>
+				<p>For a reasonable explanation of how it works, please see this example of <a href="http://www.cs.duke.edu/csed/poop/huff/info/">Huffman coding an ASCII string</a> and the overview from <a href="http://en.wikipedia.org/wiki/Huffman_coding">Wikipedia</a>. </p>
+				<p>For more details, please see my article on <a href="https://www.impulseadventure.com/photo/optimized-jpeg.html">Optimized JPEGs - optimizing the huffman tables</a>, particularly the first introductory sections and the section near the end titled "Standard Huffman Tables". </p>
+				<h2>Decoding the JPEG Scan Data </h2>
+				<h3>Using JPEGsnoop</h3>
+				<p>For those who are trying to understand the complex huffman decoding in a JPEG image, I'm happy to report
+				that <a href="https://www.impulseadventure.com/photo/jpeg-snoop.html">JPEGsnoop</a> can now report all of the variable length code decoding for each MCU (use the Detailed Decode
+				option). For the sample output, scroll to the bottom of this tutorial. </p>
+				<h3>Decoding by Hand</h3>
+				<p>The following is the decode method done by hand, which is obviously impractical for most images, but
+				is shown here in detail to help one learn the process involved.</p>
+				<img src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/huff_scan_hex.gif">
+				<p>&nbsp;</p>
+				<p>The above hex dump datastream shows the beginning of the <strong>Start of Scan</strong> (SOS marker <span class="value">0xFFDA</span>) marked in yellow, followed by some additional details in green and then
+				the actual scan data selected in dark blue. Finally, the image is terminated with an <strong>End of Image</strong> (EOI marker <span class="value">0xFFD9</span>). So, the huffman-coded data content is only <span class="value">9 bytes</span> long.</p>
+				<h3>Comparison of Compression File Sizes </h3>
+				<p>For the sake of comparison, the original image (16 pixels by 8 pixels) contains a total of <span class="value">128 pixels</span> (2 MCUs). With 8 bits per channel (<span class="value">RGB</span>), this corresponds to an uncompressed image size of <span class="value">384 bytes</span> (128 pixels x 8 bits/channel x 3 channels x 1 byte/8 bits). Clearly, using a run-length encoded format such as GIF would have produced even more image compression in examples like this (although GIF actually takes <span class="value">22 bytes</span> to code the stream because there are 16 separate runs).  JPEG is not really designed to be optimized for this type of synthetic (non-organic) image. </p>
+				<p>If one uses <strong>optimized JPEG encoding</strong>, it is possible to reduce the image content size even further. In the example image, the optimized version has much smaller huffman tables (<span class="value">DHT</span>) and shorter bitstrings to represent the same codewords. The net effect is that the image content size is reduced even further (to <span class="value">7 bytes</span>). </p>
+				<table class="tbl_stats">
+				<tbody><tr><th>File Format</th><th>Total Size</th>
+				  <th>Overhead Size </th>
+				  <th>Image Content Size</th></tr>
+				<tr>
+				  <td>BMP (Uncompressed)</td>
+				  <td>440 Bytes</td>
+				  <td>56 Bytes </td>
+				  <td>384 Bytes</td></tr>
+				<tr><td>JPEG</td><td>653 Bytes</td>
+				  <td>644 Bytes </td>
+				  <td>9 Bytes</td></tr>
+				<tr>
+				  <td>JPEG (Optimized) </td>
+				  <td>304 Bytes </td>
+				  <td>297 Bytes </td>
+				  <td>7 Bytes </td>
+				  </tr>
+				<tr><td>GIF</td><td>60 Bytes</td>
+				  <td>38 Bytes </td>
+				  <td>22 Bytes</td></tr>
+				</tbody></table>
+				<h3>Scan Data Decode</h3>
+				<p>The scan data is:</p>
+				<p class="value">FC FF 00 E2 AF EF F3 15 7F</p>
+				<p>To help resiliency in the case of data corruption, the JPEG standard allows JPEG markers to appear in the huffman-coded scan data segment. Therefore, a JPEG decoder must watch out for any marker (as indicated by the <span class="value">0xFF</span> byte, followed by a non-zero byte). If the huffman coding scheme needed to write a <span class="value">0xFF</span> byte, then it writes a <span class="value">0xFF</span> followed by a <span class="value">0x00</span> -- a process known as adding a stuff byte.</p>
+				<p>For our extraction purposes, we will replaceme any padding bytes (<span class="value">0xFF00</span> with <span class="value">0xFF</span>):</p>
+				<p class="value">FC FF E2 AF EF F3 15 7F</p>
+				<p>The expectation is that image content is 3 components (<span class="value">Y</span>, <span class="value">Cb</span>, <span class="value">Cr</span>). Within each component, the sequence is always one DC value followed by  63 AC values.</p>
+				<p>For each <a href="https://www.impulseadventure.com/photo/jpeg-minimum-coded-unit.html">MCU</a>, with no chroma subsampling, we would expect the following data to be encoded: </p>
+				<table class="tbl_stats">
+				<tbody><tr><th>Section</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td></tr>
+				<tr><th>Component</th><td colspan="2">Y</td><td colspan="2">Cb</td><td colspan="2">Cr</td></tr>
+				<tr><th>AC / DC</th><td>DC</td><td>AC</td><td>DC</td><td>AC</td><td>DC</td><td>AC</td></tr>
+				</tbody></table>
+				<p>Note that some people get the order of the chrominance channels mixed up, and assume that it is <span class="value">YCrCb</span> instead.</p>
+				<p>The figure below shows what the DCT matrix from a single MCU (<span class="value">8x8</span> pixel square) in
+				a digital photo typically looks like. These are the entries after quantization, which
+				has caused many of the higher-frequency components (towards the bottom-right corner
+				of the matrix) to become zero. By the distribution of values in the frequency-domain
+				matrix representation, it is possible to determine that the 8x8 pixel square had
+				very little high-frequency content (i.e. it had only a gradual intensity / color change).</p>
+				<img src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/huff_matrix.gif">
+				<p>The DC component represents the average value of all pixels in the 8x8 MCU. Since we have deliberately created an image where all pixels in the 8x8 block are the same, we expect this value to represent either the black or white "color". The code provided in the DC entry (#0)  indicates a huffman-encoded size (e.g. 1-10 bits) which is the number of bits needed to represent the average value for the MCU (eg. -511...+511).</p>
+				<p>Note that the DC component is encoded as a relative value with respect to the DC component of the previous block. The first block in the JPEG image is assumed to have a previous block value of zero. </p>
+				<p>Following the single DC component entry, one or more entries are used to describe the remaining 63 entries in the MCU. These entries (1..63) represent the low and high-frequency AC coefficients after DCT transformation and quantization. The earlier entries represent low-frequency content, while the later entries represent high-frequency image content. Since the JPEG compression algorithm uses quantization to reduce many of these high-frequency values to zero, one typically has a number of non-zero entries in the earlier coefficients and a long run of zero coefficients to the end of the matrix.</p>
+				<p>For the purposes of this tutorial, I have deliberately created an image that has constant color across all 8x8 pixels in each of the two MCU. Because there are no changes in value across each 8x8 pixel region, there is no AC (or higher frequency content) within the block. As a result, all 63 entries in the AC portion are expected to be zero (unlike the figure above). This allows us to focus on the DC component, which we do expect to change from MCU to MCU block. </p>
+				<p>The hex string shown earlier (after removal of padding bytes) can be represented in binary as the following: </p>
+				<p class="value">1111 1100 1111 1111 1110 0010 1010 1111 1110 1111 1111 0011 0001 0101 0111 1111 </p>
+				
+				<h2>Extract Huffman Code Tables</h2>
+				<p>Using a utility such as <a href="https://www.impulseadventure.com/photo/jpeg-snoop.html">JPEGsnoop</a>, you can
+				extract the Huffman tables from the JPEG image file. Often, you will find four huffman
+				table entries (tagged with a <span class="value">DHT</span> marker):</p>
+				<ul class="ul1">
+				<li><strong>DHT Class=0 ID=0</strong> - Used for DC component of Luminance (Y)</li>
+				<li><strong>DHT Class=1 ID=0</strong> - Used for AC component of Luminance (Y)</li>
+				<li><strong>DHT Class=0 ID=1</strong> - Used for DC component of Chrominance (Cb &amp; Cr)</li>
+				<li><strong>DHT Class=1 ID=1</strong> - Used for AC component of Chrominance (Cb &amp; Cr)</li>
+				</ul>
+				<p>The huffman compression tables are encoded in a somewhat confusing manner. Although
+				you can draw out the binary tree by hand, it will be easier if you rely on a tool
+				such as <span class="product">JPEGsnoop</span> to generate all of the binary comparison strings for each huffman code in all four DHT sections.</p>
+				<p>The following four tables were extracted from the JPEG file that was created by Photoshop for the purposes of this tutorial. Other JPEG images may be reliant on different DHT tables, so it is important to extract them prior to analyzing the file. Note that turning on <a href="https://www.impulseadventure.com/photo/optimized-jpeg.html">JPEG Optimization</a> will create vastly different Huffman tables, with far fewer entries. For a point of comparison, the image described in this tutorial would only need optimized huffman tables of one entry each to represent our image content. </p>
+				<p><strong>NOTE</strong>: It is important to realize that in each case the DHT entries in the JPEG file only list the <strong>Length</strong> and <strong>Code</strong> values, not the actual <strong>Bit String</strong> mapping. It is up to you to rebuild the binary tree representation of the DHT table to derive the bit strings! Please see the <strong>DHT Expansion</strong> section near the end of this tutorial for more details. </p>
+				<h3>Table 1 - Huffman - Luminance (Y) - DC </h3>
+
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Length</th><th>Bits</th><th>Code</th></tr>
+				<tr>
+				  <td>3 bits </td>
+				<td>000<br>
+				  001<br>
+				  010<br>
+				  011<br>
+				  100<br>
+				  101<br>
+				  110</td>
+				<td>04<br>
+				  05<br>
+				  03<br>
+				  02<br>
+				  06<br>
+				  01<br>
+				  00 (End of Block) </td>
+				</tr>
+				<tr>
+				  <td>4 bits </td>
+				  <td>1110</td>
+				  <td>07</td>
+				  </tr>
+				<tr>
+				  <td>5 bits </td>
+				  <td>1111 0</td>
+				  <td>08</td>
+				  </tr>
+				<tr>
+				  <td>6 bits </td>
+				  <td>1111 10</td>
+				  <td>09</td>
+				  </tr>
+				<tr>
+				  <td>7 bits </td>
+				  <td>1111 110 </td>
+				  <td>0A</td>
+				  </tr>
+				<tr>
+				  <td>8 bits </td>
+				  <td>1111 1110 </td>
+				  <td>0B</td>
+				  </tr>
+				</tbody></table>
+
+				<h3>Table 2 - Huffman - Luminance (Y) - AC </h3>
+
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Length</th><th>Bits</th><th>Code</th></tr>
+				<tr>
+				  <td>2 bits </td>
+				  <td>00<br>
+				  01</td>
+				<td>				  01<br>
+				  02</td>
+				</tr>
+				<tr>
+				  <td>3 bits </td>
+				  <td>100</td>
+				  <td>03</td>
+				  </tr>
+				<tr>
+				  <td>4 bits </td>
+				  <td>1010<br>
+			      1011<br>
+			      1100</td>
+				  <td>11<br>
+				    04<br>
+				    00 (End of Block) </td>
+				  </tr>
+				<tr>
+				  <td>5 bits </td>
+				  <td>1101 0<br>
+				    1101 1<br>
+				    1110 0 </td>
+				  <td>05<br>
+				    21<br>
+				    12</td>
+				  </tr>
+				<tr>
+				  <td>6 bits </td>
+				  <td>1110 10<br>
+			      1110 11 </td>
+				  <td>31<br>
+				    41</td>
+				  </tr>
+				<tr>
+				  <td>...</td>
+				  <td>...</td>
+				  <td>...</td>
+				  </tr>
+				<tr>
+				  <td>12 bits</td>
+				  <td>...<br>
+			      1111 1111 0011<br>
+			      ...</td>
+				  <td>...<br>
+				    F0 (ZRL)<br>
+				    ...</td>
+				  </tr>
+				<tr>
+				  <td>...</td>
+				  <td>...</td>
+				  <td>...</td>
+				  </tr>
+				<tr>
+				  <td>16 bits </td>
+				  <td>...<br>
+			      1111 1111 1111 1110 </td>
+				  <td>...<br>
+			      FA</td>
+				  </tr>
+				</tbody></table>
+
+				<h3>Table 3 - Huffman - Chrominance (Cb &amp; Cr) - DC </h3>
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Length</th><th>Bits</th><th>Code</th></tr>
+				<tr>
+				  <td>2 bits </td>
+				  <td>00<br>
+			      01</td>
+				  <td>01<br>
+				  00 (End of Block) </td>
+				</tr>
+				<tr>
+				  <td>3 bits </td>
+				  <td>100<br>
+			      101</td>
+				  <td>02<br>
+				    03</td>
+				  </tr>
+				<tr>
+				  <td>4 bits </td>
+				  <td>1100<br>
+				    1101<br>
+				    1110</td>
+				  <td>04<br>
+				    05<br>
+				    06</td>
+				  </tr>
+				<tr>
+				  <td>5 bits </td>
+				  <td>1111 0 </td>
+				  <td>07</td>
+				  </tr>
+				<tr>
+				  <td>6 bits </td>
+				  <td>1111 10 </td>
+				  <td>08</td>
+				  </tr>
+				<tr>
+				  <td>7 bits </td>
+				  <td>1111 110 </td>
+				  <td>09</td>
+				  </tr>
+				<tr>
+				  <td>8 bits </td>
+				  <td>1111 1110 </td>
+				  <td>0A</td>
+				  </tr>
+				<tr>
+				  <td>9 bits </td>
+				  <td>1111 1111 0 </td>
+				  <td>0B</td>
+				  </tr>
+				</tbody></table>
+
+				<h3>Table 4 - Huffman - Chrominance (Cb &amp; Cr) - AC </h3>
+				
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Length</th><th>Bits</th><th>Code</th></tr>
+				<tr>
+				  <td>2 bits </td>
+				  <td>00<br>
+				  01</td>
+				<td>				  01<br>
+				  00 (End of Block) </td>
+				</tr>
+				<tr>
+				  <td>3 bits </td>
+				  <td>100<br>
+			      101</td>
+				  <td>02<br>
+			      11</td>
+				  </tr>
+				<tr>
+				  <td>4 bits </td>
+				  <td>1100 </td>
+				  <td>03</td>
+				  </tr>
+				<tr>
+				  <td>5 bits </td>
+				  <td><p>1101 0<br> 
+				    1101 1 </p>
+			      </td>
+				  <td>04<br>
+			      21</td>
+				  </tr>
+				<tr>
+				  <td>6 bits </td>
+				  <td>1110 00<br>
+				    1110 01<br>
+				    1110 10 </td>
+				  <td>12<br>
+				    31<br>
+				    41</td>
+				  </tr>
+				<tr>
+				  <td>...</td>
+				  <td>...</td>
+				  <td>...</td>
+				  </tr>
+				<tr>
+				  <td>9 bits</td>
+				  <td>...<br>
+				  1111	1100	0<br>
+			      ...</td>
+				  <td>...<br>
+				    F0 (ZRL)<br>
+				    ...</td>
+				  </tr>
+				<tr>
+				  <td>...</td>
+				  <td>...</td>
+				  <td>...</td>
+				  </tr>
+				<tr>
+				  <td>16 bits </td>
+				  <td>...<br>
+			      1111 1111 1111 1110 </td>
+				  <td>...<br>
+			      FA</td>
+				  </tr>
+				</tbody></table>
+				
+				
+				<p>&nbsp;</p>
+				<h3>Table 5 - Huffman DC Value Encoding</h3>
+				<p>The following table shows how the bit fields that follow
+				a DC entry can be converted into their signed decimal equivalent. To
+				use this table, start with the DC code value and then extract "Size" number of bits after the code. These "Additional Bits" will represent a signed "DC Value" which becomes the DC value for that block. Note that this table applies to any JPEG file -- this table is not written anywhere in the JPEG file itself. </p>
+				<p>For example, let's assume that one was about to decompress a chrominance DC entry. If the previously-decoded "DC Code" was <span class="value">05</span>, then we must extract 5 bits following the code bits. If the next 5 bits were <span class="value">00101</span>, then this can be interpreted as decimal <span class="value">-26</span>. The bits <span class="value">10001</span> would be <span class="value">+17</span> and <span class="value">11110</span> would be <span class="value">+30</span>. </p>
+				<table class="tbl_stats">
+				<tbody><tr>
+				  <th>DC Code </th>
+				  <th>Size</th>
+				  <th colspan="2">Additional Bits </th>
+				  <th colspan="2">DC Value</th>
+				</tr>
+				<tr>
+				  <td>00</td>
+				  <td>0</td>
+					<td align="right" colspan="2">&nbsp;</td>
+					<td align="center" colspan="2">0</td></tr>
+				<tr>
+				  <td>01</td>
+				  <td>1</td>
+					<td align="right">0</td><td>1</td>
+					<td align="right">-1</td><td>1</td></tr>
+				<tr>
+				  <td>02</td>
+				  <td>2</td>
+				  <td align="right">00,01</td><td>10,11</td>
+				  <td align="right">-3,-2</td><td>2,3</td>
+				  </tr>
+				<tr>
+				  <td>03</td>
+				  <td>3</td>
+				  <td align="right">000,001,010,011</td><td>100,101,110,111</td>
+				  <td align="right">-7,-6,-5,-4</td><td>4,5,6,7</td>
+				  </tr>
+				<tr>
+				  <td>04</td>
+				  <td>4</td>
+				  <td align="right">0000,...,0111</td><td>1000,...,1111</td>
+				  <td align="right">-15,...,-8</td><td>8,...,15</td>
+				  </tr>
+				<tr>
+				  <td>05</td>
+				  <td>5</td>
+				  <td align="right">0 0000,...</td>
+				  <td>...,1 1111 </td>
+				  <td align="right">-31,...,-16</td>
+				  <td>16,...,31</td>
+				  </tr>
+				<tr>
+				  <td>06</td>
+				  <td>6</td>
+				  <td align="right">00 0000,...</td>
+				  <td>...,11 1111 </td>
+				  <td align="right">-63,...,-32</td>
+				  <td>32,...,63</td>
+				  </tr>
+				<tr>
+				  <td>07</td>
+				  <td>7</td>
+				  <td align="right">000 0000,...</td>
+				  <td>...,111 1111 </td>
+				  <td align="right">-127,...,-64</td>
+				  <td>64,...,127</td>
+				  </tr>
+				<tr>
+				  <td>08</td>
+				  <td>8</td>
+				  <td align="right">0000 0000,...</td>
+				  <td>...,1111 1111 </td>
+				  <td align="right">-255,...,-128</td>
+				  <td>128,...,255</td>
+				  </tr>
+				<tr>
+				  <td>09</td>
+				  <td>9</td>
+				  <td align="right">0 0000 0000,...</td>
+				  <td>...,1 1111 1111 </td>
+				  <td align="right">-511,...,-256</td>
+				  <td>256,...,511</td>
+				  </tr>
+				<tr>
+				  <td>0A</td>
+				  <td>10</td>
+				  <td align="right">00 0000 0000,...</td>
+				  <td>...,11 1111 1111 </td>
+				  <td align="right">-1023,...,-512</td>
+				  <td>512,...,1023</td>
+				  </tr>
+				<tr>
+				  <td>0B</td>
+				  <td>11</td>
+				  <td align="right">000 0000 0000,...</td>
+				  <td>...,111 1111 1111</td>
+				  <td align="right">-2047,...,-1024</td>
+				  <td>1024,...,2047</td>
+				  </tr>
+				</tbody></table>
+				
+				
+				
+				<h2>Block 1 - Luminance</h2>
+				<h3>Luminance (Y) - DC </h3>
+				<p>Referring to the  Y(DC) table (Table 1), we start with the first few bits of the coded stream (<span class="value">1111 1100 1111</span>...) and recognize that code <span class="value">x0A</span> matches the bit string <span class="value">1111 110</span>.</p>
+				<p class="value"><span class="entrygood">1111 110</span>0 1111 1111 1110 0010 1010 1111 1110 1111 1111 0011 0001 0101 0111 1111<br>
+				=&gt; Code: 0A </p>
+
+				<p>This code implies that hex <span class="value">A</span> (10) additional bits follow to represent the signed value of the DC component. The next ten bits after this code is <span class="value">0 1111 1111 1</span>. Table 5 above shows the DC values represented by these "additional bits" -- in this case, the bit string corresponds to a value of <span class="value">-512</span>.  </p>
+				<p class="value"><span class="entrybad">1111 110</span><span class="entrygood">0 1111 1111 1</span>110 0010 1010 1111 1110 1111 1111 0011 0001 0101 0111 1111<br>
+				=&gt; Value: -512 </p>
+				<p>Our progress so far:</p>
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Bits</th><td>1111 1100 1111 1111 1</td>
+				  <td>110 0010 1010 1111 1110 1111 1111 0011 0001 0101 0111 1111</td></tr>
+				<tr><th>MCU</th><td>1</td><td>???</td></tr>
+				<tr><th>Component</th><td>Y</td>
+				  <td>???</td></tr>
+				<tr>
+				  <th>AC/DC</th>
+				  <td>DC</td>
+				  <td>???</td>
+				  </tr>
+				<tr><th>Value</th>
+				<td>-512</td>
+				<td>???</td></tr>
+				</tbody></table>
+				<h3>Luminance (Y) - AC</h3>
+				<p>After the DC component, we begin the 63-entry AC matrix for the Y Luminance. This uses a different Huffman table (Table 2). </p>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1</span><span class="entrygood">110 0</span>010 1010 1111 1110 1111 1111 0011 0001 0101 0111 1111<br>
+				=&gt; Code: 00 (EOB) </p>
+				<p>In the above huffman code table, the code <span class="value">1100</span> corresponds to an <span class="value">EOB</span> (End of Block). Therefore, the AC components was cut short early (no other codes). This means that all 63 entries of the matrix (all entries except the 1st entry, which is the DC component) are zeros. Since we have finished the luminance component, we then move on to the chrominance components (<span class="value">Cb</span> and <span class="value">Cr</span>). </p>
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Bits</th><td>1111 1100 1111 1111 1</td>
+				  <td>1100</td><td>010 1010 1111 1110 1111 1111 0011 0001 0101 0111 1111</td></tr>
+				<tr><th>MCU</th><td colspan="2">1</td><td>???</td></tr>
+				<tr><th>Component</th><td colspan="2">Y</td>
+				  <td>???</td></tr>
+				<tr>
+				  <th>AC/DC</th>
+				  <td>DC</td>
+				  <td>AC</td>              
+				  <td>???</td>
+				  </tr>
+				<tr><th>Value</th>
+				<td>-512</td>
+				<td>0</td><td>???</td></tr>
+				</tbody></table>
+				<h2>Block 1 - Chrominance</h2>
+				<h3>Chrominance (Cb) - DC </h3>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0</span><span class="entrygood">01</span>0 1010 1111 1110 1111 1111 0011 0001 0101 0111 1111<br>
+				=&gt; Code: 00 (EOB) </p>
+				<p>End of chrominance DC, start on AC.</p>
+				<h3>Chrominance (Cb) - AC </h3>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 001</span><span class="entrygood">0 1</span>010 1111 1110 1111 1111 0011 0001 0101 0111 1111<br>
+				=&gt; Code: 00 (EOB) </p>
+				<p>Again, the AC is terminated right away. Now, we move on to the second chrominance channel, Cr.</p>
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Bits</th><td>1111 1100 1111 1111 1</td>
+				  <td>1100</td><td>01</td><td>01</td><td>010 1111 1110 1111 1111 0011 0001 0101 0111 1111</td></tr>
+				<tr><th>MCU</th><td colspan="4">1</td><td>???</td></tr>
+				<tr><th>Component</th>
+				  <td colspan="2">Y</td>
+				  <td colspan="2">Cb</td>
+				  <td>???</td></tr>
+				<tr>
+				  <th>AC/DC</th>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>???</td>
+				  </tr>
+				<tr><th>Value</th>
+				<td>-512</td>
+				<td>0</td><td>0</td><td>0</td><td>???</td></tr>
+				</tbody></table>
+				<h3>Chrominance (Cr) - DC</h3>
+				<p>Refer to Table 3 for the relevant Huffman codes.</p>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1</span><span class="entrygood">01</span>0 1111 1110 1111 1111 0011 0001 0101 0111 1111<br>
+				=&gt; Code: 00 (EOB) </p>
+				<p>This marks the end of the DC. </p>
+				<h3>Chrominance (Cr) - AC</h3>
+				<p>Refer to Table 4 for the relevant Huffman codes.</p>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 101</span><span class="entrygood">0 1</span>111 1110 1111 1111 0011 0001 0101 0111 1111<br>
+				=&gt; Code: 00 (EOB) </p>
+				<p>This marks the end of the AC.</p>
+
+		
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Bits</th><td>1111 1100 1111 1111 1</td>
+				  <td>1100</td><td>01</td>
+				  <td>01</td><td>01</td>
+				  <td>01</td><td>111 1110 1111 1111 0011 0001 0101 0111 1111</td></tr>
+				<tr><th>MCU</th><td colspan="6">1</td><td>???</td></tr>
+				<tr><th>Component</th><td colspan="2">Y</td>
+				  <td colspan="2">Cb</td>
+				  <td colspan="2">Cr</td>
+				  <td>???</td></tr>
+				<tr>
+				  <th>AC / DC </th>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>???</td>
+				  </tr>
+				<tr><th>Value</th>
+				  <td>-512</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>???</td></tr>
+				</tbody></table>
+						
+				<h2>Block 2 - Luminance</h2>
+				<h3>Luminance (Y) - DC</h3>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1010 1</span><span class="entrygood">111 1110</span> 1111 1111 0011 0001 0101 0111 1111<br>
+				=&gt; CODE: 0A</p>
+				<p>This code indicates that the value is stored in the next ten bits (<span class="value">A</span> in hex is <span class="value">10</span> in decimal):</p>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1010 1111 1110</span><span class="entrygood"> 1111 1111 00</span>11 0001 0101 0111 1111<br>
+				=&gt; Value: +1020 </p>
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Bits</th><td>1111 1100 1111 1111 1</td>
+				  <td>1100</td><td>01</td>
+				  <td>01</td><td>01</td>
+				  <td>01</td><td>111 1110 1111 1111 00</td><td>11 0001 0101 0111 1111</td></tr>
+				<tr><th>MCU</th><td colspan="6">1</td><td>2</td><td>???</td></tr>
+				<tr><th>Component</th><td colspan="2">Y</td>
+				  <td colspan="2">Cb</td>
+				  <td colspan="2">Cr</td>
+				  <td>Y</td><td>???</td></tr>
+				<tr>
+				  <th>AC / DC </th>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>???</td>
+				  </tr>
+				<tr><th>Value</th>
+				<td>-512</td>
+				<td>0</td><td>0</td><td>0</td><td>0</td><td>0</td>
+				<td>+1020</td>
+				<td>???</td></tr>
+				</tbody></table>
+				
+				<h3>Luminance (Y) - AC</h3>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1010 1111 1110 1111 1111 00</span><span class="entrygood">11 00</span>01 0101 0111 1111<br>
+				=&gt; CODE: EOB </p>
+				<p>The end-of-block indicator means that all remaining values are zero. Since we haven't even started with the first value, all 63 values can be interpreted as zero. This means that there is no non-DC image content, which is to be expected since all 64 pixels (8x8) in the block are the same color. </p>
+
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Bits</th><td>1111 1100 1111 1111 1</td>
+				  <td>1100</td><td>01</td>
+				  <td>01</td><td>01</td>
+				  <td>01</td><td>111 1110 1111 1111 00</td>
+				  <td>1100</td>
+				  <td>01 0101 0111 1111</td></tr>
+				<tr><th>MCU</th><td colspan="6">1</td><td colspan="2">2</td><td>???</td></tr>
+				<tr><th>Component</th><td colspan="2">Y</td>
+				  <td colspan="2">Cb</td>
+				  <td colspan="2">Cr</td>
+				  <td colspan="2">Y</td><td>???</td></tr>
+				<tr>
+				  <th>AC / DC </th>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>???</td>
+				  </tr>
+				<tr><th>Value</th>
+				<td>-512</td>
+				<td>0</td><td>0</td><td>0</td><td>0</td><td>0</td>
+				<td>+1020</td>
+				<td>0</td><td>???</td></tr>
+				</tbody></table>
+
+				<h2>Block 2 - Chrominance</h2>
+				<h3>Chrominance (Cb) - DC</h3>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1010 1111 1110 1111 1111 0011 00</span><span class="entrygood">01</span> 0101 0111 1111<br>
+				=&gt; CODE: 00 (EOB)</p>
+				
+				<h3>Chrominance (Cb) - AC</h3>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1010 1111 1110 1111 1111 0011 0001 </span><span class="entrygood">01</span>01 0111 1111<br>
+				=&gt; CODE: 00 (EOB)</p>
+				
+				<h3>Chrominance (Cr) - DC</h3>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1010 1111 1110 1111 1111 0011 0001 01</span><span class="entrygood">01</span> 0111 1111<br>
+				=&gt; CODE: 00 (EOB)</p>
+				
+				<h3>Chrominance (Cr) - AC</h3>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1010 1111 1110 1111 1111 0011 0001 0101 </span><span class="entrygood">01</span>11 1111<br>
+				=&gt; CODE: 00 (EOB)</p>
+
+				<table class="tbl_stats_tight">
+				<tbody><tr><th>Bits</th><td>1111 1100 1111 1111 1</td>
+				  <td>1100</td><td>01</td>
+				  <td>01</td><td>01</td>
+				  <td>01</td><td>111 1110 1111 1111 00</td>
+				  <td>1100</td>
+				  <td>01</td><td>01</td><td>01</td><td>01</td><td>11 1111</td></tr>
+				<tr><th>MCU</th><td colspan="6">1</td><td colspan="6">2</td><td>X</td></tr>
+				<tr><th>Component</th><td colspan="2">Y</td>
+				  <td colspan="2">Cb</td>
+				  <td colspan="2">Cr</td>
+				  <td colspan="2">Y</td>
+				  <td colspan="2">Cb</td>
+				  <td colspan="2">Cr</td>
+				  <td>X</td></tr>
+				<tr>
+				  <th>AC / DC </th>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>DC</td>
+				  <td>AC</td>
+				  <td>X</td>
+				  </tr>
+				<tr><th>Value</th>
+				<td>-512</td>
+				<td>0</td><td>0</td><td>0</td><td>0</td><td>0</td>
+				<td>+1020</td>
+				<td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>X</td></tr>
+				</tbody></table>
+				
+				<h2>Remainder</h2>
+				<p>Because the scan data must end on a byte boundary, there may be a remainder of
+				bits that will simply be tossed. In this case we see 6 bits (all-1's) that will
+				be discarded.</p>
+				<p class="value"><span class="entrybad">1111 1100 1111 1111 1110 0010 1010 1111 1110 1111 1111 0011 0001 0101 01</span><span class="entrygood">11 1111</span></p>
+				
+				<h2>Conversion to Spatial Domain</h2>
+				<p>Now that we have the DCT (Discrete Cosine Transform) values, we can try to
+				determine what the content of the image was in the spatial domain. Remember
+				that the DC &amp; AC values that we decompressed from the huffman coding are 
+				the frequency-domain representation of the image, not the real <span class="value">YCbCr</span> values.</p>
+				<p>Given that all of the values in the <span class="value">Cb</span> and <span class="value">Cr</span> channels (chrominance) are zero, we can assume that the image is grayscale and instaed focus on the luminance values (brightness).</p>
+				<p>Second, all of the AC component values are zero, which means that there is no higher frequency content in the images -- in fact, we can determine that all of the image data in each 8x8 block is of the same color &amp; intensity (i.e. only the DC component remains).</p>
+				<p>We can determine the following:</p>
+				<table class="tbl_stats">
+				<tbody><tr><th>Block</th><th>Encoded (Relative) DC Value</th></tr>
+				<tr><td>1</td><td>Y = -512</td></tr>
+				<tr>
+				  <td>2</td>
+				  <td>Y = +1020 </td>
+				</tr>
+				</tbody></table>
+				<h3>Relative DC to Absolute DC</h3>
+				<p>Note that the DC components are encoded as a difference from the previous block (with the first block assumed to start relative	to	zero).	Therefore,	we know that block 1 has a DC value of <span class="value">-512</span>, but that block 2 has a DC value of <span class="value">+1020</span> relative to block 1. So, we now know:</p>
+				<table class="tbl_stats">
+				<tbody><tr><th>Block</th><th>Actual (Absolute) DC Value</th></tr>
+				<tr><td>1</td><td>Y = -512</td></tr>
+				<tr>
+				  <td>2</td>
+				  <td>Y = +508</td>
+				</tr>
+				</tbody></table>
+				<h3>DCT to RGB</h3>
+				<p>Finally, we want to convert the DCT DC value to an RGB value. Assuming that 
+				the gain of the DCT transform is 4, we divide the values by 4 to get <span class="value">block1 = -128</span>, <span class="value">block2 = +127</span>.</p>
+				<p>Now, we have to convert between <span class="value">YCbCr</span> and <span class="value">RGB</span>. Please refer to the formulae provided on the <a href="https://www.impulseadventure.com/photo/jpeg-color-space.html">JPEG color conversion</a> page. There, you will see that we require a level shift of +128 to get input values in the range (0..255). </p>
+				<p>Color conversion yields RGB values of:</p>
+				<table class="tbl_stats">
+				<tbody><tr><th>Block</th><th>RGB Value (hex)</th><th>RGB Value (decimal)</th></tr>
+				<tr><td>1</td><td>(0x00,0x00,0x00)</td><td>(0,0,0)</td></tr>
+				<tr><td>2</td>
+				<td>(0xFF,0xFF,0xFF)</td>
+				<td>(255,255,255)</td>
+				</tr>
+				</tbody></table>
+				<p>... and these are the original values that were used to create the JPEG image!</p>
+
+				<h2>Expansion of DHT Table into binary bit strings</h2>
+				<p>Note that the DHT tables that appear in the JPEG file only define the number of codes for each bitstring length, followed by a sequence of all the code words. The bit strings that are used to represent each of these code words is not included! It is the job of the JPEG decoder to derive these bit strings from the little information that is provided.</p>
+				<p>There are many methods in which the generation of the binary strings is performed in a decoder, and most of them are heavily optimized for performance (e.g. the <span class="product">djpeg</span> huffman routines). These implementations are quite difficult to learn from. I find it much more instructive to generate these bit sequences by drawing out the huffman binary tree by hand.</p>
+				<p>In an extreme simplification, binary trees are composed of a root node which has a left and right branch to other nodes. Each of these nodes can either be a leaf node (the end of a branch) or split further into two more nodes.</p>
+				<h3>The actual DHT in the JPEG file: </h3>
+				<p>The following was extracted directly from the DHT (Define Huffman Table, shown above in Table 2: Luminance AC)  in
+				the JPEG file using <a href="https://www.impulseadventure.com/photo/jpeg-snoop.html">JPEGsnoop</a>.</p>
+                <pre>  Class = 1 (AC Table)
+  Destination ID = 0
+    Codes of length 01 bits (000 total): 
+    Codes of length 02 bits (002 total): 01 02 
+    Codes of length 03 bits (001 total): 03 
+    Codes of length 04 bits (003 total): 11 04 00 
+    Codes of length 05 bits (003 total): 05 21 12 
+    Codes of length 06 bits (002 total): 31 41 
+    Codes of length 07 bits (004 total): 51 06 13 61 
+    Codes of length 08 bits (002 total): 22 71 
+    Codes of length 09 bits (006 total): 81 14 32 91 A1 07 
+    Codes of length 10 bits (007 total): 15 B1 42 23 C1 52 D1 
+    Codes of length 11 bits (003 total): E1 33 16 
+    Codes of length 12 bits (004 total): 62 F0 24 72 
+    Codes of length 13 bits (002 total): 82 F1 
+    Codes of length 14 bits (006 total): 25 43 34 53 92 A2 
+    Codes of length 15 bits (002 total): B2 63 
+    Codes of length 16 bits (115 total): 73 C2 35 44 27 93 A3 B3 36 17 54 64 74 C3 D2 E2 
+                                         08 26 83 09 0A 18 19 84 94 45 46 A4 B4 56 D3 55 
+                                         28 1A F2 E3 F3 C4 D4 E4 F4 65 75 85 95 A5 B5 C5 
+                                         D5 E5 F5 66 76 86 96 A6 B6 C6 D6 E6 F6 37 47 57 
+                                         67 77 87 97 A7 B7 C7 D7 E7 F7 38 48 58 68 78 88 
+                                         98 A8 B8 C8 D8 E8 F8 29 39 49 59 69 79 89 99 A9 
+                                         B9 C9 D9 E9 F9 2A 3A 4A 5A 6A 7A 8A 9A AA BA CA 
+                                         DA EA FA 
+    Total number of codes: 162
+</pre>
+<p>So, how do we create the binary bit-strings for each of these codes?</p>
+<p>Well, we start to
+  build a binary tree, creating new branches and putting the code words into leaf nodes of the tree. Row 1 of the tree contains code words that only require 1 bit to encode, row 2 contains code words (leaf nodes) that only require 2 bits to encode and so on. </p>
+<p>We first start with row 0:</p>
+<ul class="ul1">
+<li><strong>Row 0</strong> (the root node) is almost always a parent node, creating a left and a right branch down to the next row. We label the left branch 0 and the right branch 1.</li>
+<li>At <strong>row 1</strong>, we try to fill in any of the nodes (there are 2 at this level) with code words that take 1 bit to encode. We see from the DHT that there are no codes of length 1 bit. So, for each of the two nodes we spawn off a left and right node below (on row 2), creating a total of 4 nodes. Again, for these branches, we label the left one 0 and the right one 1. </li>
+				<li>At <strong>row 2</strong>, we  will try to fill in any codes of length 2 bits, starting from left to right. This time we see in the DHT that there are two codes that can be encoded with bit strings of length 2. So, we take the first code value x01 (hex) and place this in the first node, making it a leaf node (no further branches will come from it). We then take the second code value x02 and place this in the second node, making it too a leaf node. At this point we have two more nodes left in this row of the tree but no more codewords listed in the DHT for this bitstring length. Therefore, we create two branches for each of the remaining nodes of this row. Since two nodes are left, this will create a total of 4 branches, meaning that there will be again 4 nodes in the third row of the binary tree.</li>
+				<li>At <strong>row 3</strong>, we have four nodes available, but the DHT indicates only one codeword uses 3 bits to encode. So, we place x03 at the leftmost of these nodes, and we create branches for each of the remaining three nodes (making 6 nodes for row 4).</li>
+				<li>At <strong>row 4</strong>, we have six nodes available, but the DHT indicates only three codewords use 4 bits to encode. This time we terminate three nodes (making them leaf nodes) and we further extend the other three down to row 5.</li>
+</ul>
+				<p>This process continues until we have used all of the codewords defined in the DHT table.   The diagram below shows the expansion of the first four rows of the above DHT. </p>
+				<table align="center">
+				<tbody><tr><td>
+				<img src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/huff_tree1.gif">
+				</td></tr>
+				<tr><td class="cap">Binary Tree Expansion of DHT</td></tr>
+				</tbody></table>
+				<p><em>NOTE: I understand from VG that the above representation may be "right-oriented" rather than "left-oriented"</em></p> 
+
+				<p>Once the binary tree has been completed, you can read off the bit strings for each code word by combining the bit labels of each branch on the path down from the root node. For example, code word 0x04 is encoded by the binary bit string 1011 because we need to take branch 1 from the root node, 0 from the node on row 1, 1 from the node on row 2 and branch 1 from the node on row 3.</p>
+				<p>This process can be quite laborious, and the binary tree often takes on a shape that would be difficult to draw through to completion. To make this easier, I have added a feature, DHT Expand, to JPEGsnoop that determines the binary bit strings for each of the code words appearing in the DHT table. </p>
+				<p>Below is the expansion of the first few rows of the table, using JPEGsnoop with the DHT Expand mode enabled.</p>
+                <pre>  Expanded Form of Codes:
+    Codes of length 02 bits:
+      00 = 01
+      01 = 02
+    Codes of length 03 bits:
+      100 = 03
+    Codes of length 04 bits:
+      1010 = 11
+      1011 = 04
+      1100 = 00 (EOB)
+    Codes of length 05 bits:
+      11010 = 05
+      11011 = 21
+      11100 = 12
+    Codes of length 06 bits:
+      111010 = 31
+      111011 = 41
+    Codes of length 07 bits:
+      1111000 = 51
+	   ...
+    Codes of length 15 bits:
+      111111111000100 = B2
+      111111111000101 = 63
+    Codes of length 16 bits:
+      1111111110001100 = 73
+      1111111110001101 = C2
+	   ...
+      1111111111111100 = DA
+      1111111111111101 = EA
+      1111111111111110 = FA
+</pre>
+<p>Implementations in real JPEG decoders optimize this mechanism heavily as the bitstring search / parsing process
+is not a trivial task in processors designed to work with 32-bit words or bytes. Most of them end up
+creating large lookup tables that define lower and upper bounds for a match of a particular bitstring / 
+code.</p>
+
+				<h2>More Realistic JPEG Images</h2>
+				<p>Obviously the above is an extremely simple example JPEG image. However, real images will have some other characteristics that you will encounter:</p>
+				<ul class="ul1">
+				<li><strong>Chroma subsampling</strong> - You can expect that most photos will have 2x1 chroma subsampling, which will mean that the decoding sequence per MCU will be <span class="value">Y1 Y2 Cb Cr</span> instead of <span class="value">Y Cb Cr</span>.</li>
+				<li><strong>AC components</strong> - You most certainly will have non-zero AC coefficients, unlike the above. In such a case, you will generally have a few non-zero values, which will eventually be terminated with a <span class="value">ZRL</span> (code word <span class="value">0xF0</span>) which indicates a run of 16 zeros and then probably a <span class="value">EOB</span> (code word <span class="value">0x00</span>).</li>
+				</ul>
+				<p>Some more detail regarding Huffman coding with chroma subsampling and other
+				factors are described in the <a href="https://www.impulseadventure.com/photo/jpeg-decoder.html">JPEG decoder</a> page.</p>
+				<h2>JPEGsnoop Detailed Decode Output</h2>
+				<p>Running <a href="https://www.impulseadventure.com/photo/jpeg-snoop.html">JPEGsnoop</a> on the image shown above, with the <span class="value">Scan Segment-&gt;Detailed Decode</span> option enabled, the following output is shown:</p>
+				
+				<pre>*** Decoding SCAN Data ***
+  OFFSET: 0x00000282
+  Scan Decode Mode: Full IDCT (AC + DC)
+
+
+    Lum (Tbl #0), MCU=[0,0]
+      [0x00000282.0]: ZRL=[ 0] Val=[ -512] Coef=[00= DC] Data=[0x FC FF 00 E2 = 0b (11111100 11111111 1------- --------)] 
+      [0x00000285.1]: ZRL=[ 0] Val=[    0] Coef=[01..01] Data=[0x E2 AF EF F3 = 0b (-1100--- -------- -------- --------)] EOB
+                      DCT Matrix=[-1024     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+
+    Chr(0) (Tbl #1), MCU=[0,0]
+      [0x00000285.5]: ZRL=[ 0] Val=[    0] Coef=[00= DC] Data=[0x E2 AF EF F3 = 0b (-----01- -------- -------- --------)] EOB
+      [0x00000285.7]: ZRL=[ 0] Val=[    0] Coef=[01..01] Data=[0x E2 AF EF F3 = 0b (-------0 1------- -------- --------)] EOB
+                      DCT Matrix=[    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+
+    Chr(0) (Tbl #1), MCU=[0,0]
+      [0x00000286.1]: ZRL=[ 0] Val=[    0] Coef=[00= DC] Data=[0x AF EF F3 15 = 0b (-01----- -------- -------- --------)] EOB
+      [0x00000286.3]: ZRL=[ 0] Val=[    0] Coef=[01..01] Data=[0x AF EF F3 15 = 0b (---01--- -------- -------- --------)] EOB
+                      DCT Matrix=[    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+
+
+    Lum (Tbl #0), MCU=[1,0]
+      [0x00000286.5]: ZRL=[ 0] Val=[ 1020] Coef=[00= DC] Data=[0x AF EF F3 15 = 0b (-----111 11101111 111100-- --------)] 
+      [0x00000288.6]: ZRL=[ 0] Val=[    0] Coef=[01..01] Data=[0x F3 15 7F FF = 0b (------11 00------ -------- --------)] EOB
+                      DCT Matrix=[ 2040     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+
+    Chr(0) (Tbl #1), MCU=[1,0]
+      [0x00000289.2]: ZRL=[ 0] Val=[    0] Coef=[00= DC] Data=[0x 15 7F FF D9 = 0b (--01---- -------- -------- --------)] EOB
+      [0x00000289.4]: ZRL=[ 0] Val=[    0] Coef=[01..01] Data=[0x 15 7F FF D9 = 0b (----01-- -------- -------- --------)] EOB
+                      DCT Matrix=[    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+
+    Chr(0) (Tbl #1), MCU=[1,0]
+      [0x00000289.6]: ZRL=[ 0] Val=[    0] Coef=[00= DC] Data=[0x 15 7F FF D9 = 0b (------01 -------- -------- --------)] EOB
+      [0x0000028A.0]: ZRL=[ 0] Val=[    0] Coef=[01..01] Data=[0x 7F FF D9 00 = 0b (01------ -------- -------- --------)] EOB
+                      DCT Matrix=[    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+                                 [    0     0     0     0     0     0     0     0]
+				
+				</pre>
+				
+				</div>
+			  <!-- InstanceEndEditable -->
+			  
+	  <!-- Reader Section Start -->
+			<div class="comments">
+			<p>&nbsp;</p>
+			
+<script async="" src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/f.txt"></script>
+<!-- FreshResp -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-2529752145788811" data-ad-slot="2429524366" data-ad-format="auto"></ins>
+<script>
+(adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+		
+	<hr>
+	<a name="comments"></a>
+	<table width="600">
+	  <tbody><tr>
+	    <td><h2>Reader's Comments:</h2>
+		<span class="small">Please leave your comments or suggestions below!</span></td>
+		 <td>
+<form name="frm_notify" method="post" action="https://www.impulseadventure.com/notify.php">
+  <input name="action" type="hidden" value="add">
+  <input name="page" type="hidden" value="991">
+  <input name="type" type="hidden" value="page">
+  <input type="submit" value="Notify me of Page Updates" style="width:180px;">
+</form>
+	
+<form name="frm_notify" method="post" action="https://www.impulseadventure.com/notify.php">
+  <input name="action" type="hidden" value="add">
+  <input name="page" type="hidden" value="991">
+  <input name="type" type="hidden" value="comm">
+  <input type="submit" value="Notify me of New Comments" style="width:180px;">
+</form>
+	</td></tr></tbody></table>
+<table class="comments" cellpadding="5" cellspacing="5">
+<tbody><tr><td width="60" class="cmt_list_date">2019-05-29</td><td class="cmt_list_row">Majid</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Dear Calvin,<br>
+It was so nice to find out such an extraordinary explaining of JPEG.<br>
+I was wondering how could use this general method in specific manner like DICOM jpeg lossless?<br>
+I am little confused by decoding this kind of images.<br>
+I could follow the procedure as DPCM and difference between values but have so many misunderstanding of Huffman table.<br>
+I apllied method for an image but it does not work on another one...<br>
+it seems I could not got huffman table so well.<br>
+I would be appreciate if there is any clear explanation of huffman just like you do for jpeg.<br>
+<br>
+great job by the way.<br>
+Thanks for sharing<br>
+Majid</td></tr>
+<tr><td width="60" class="cmt_list_date">2018-11-17</td><td class="cmt_list_row">Chris</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin,<br>
+<br>
+In your JPEGscnoop program, in the expanded form of codes for the Huffman tables, how do you come up with the "(Total Len = X)" value? That's the only part out of your whole algorithm I'm not understanding.<br>
+<br>
+Thanks for the great tutorial!<br>
+<br>
+Example below:<br>
+<pre> OFFSET: 0x000000D2
+  Huffman table length = 181
+  ----
+  Destination ID = 0
+  Class = 1 (AC Table)
+    Codes of length 01 bits (000 total): 
+    Codes of length 02 bits (002 total): 01 02 
+    Codes of length 03 bits (001 total): 03 
+    Codes of length 04 bits (003 total): 00 04 11 
+    Codes of length 05 bits (003 total): 05 12 21 
+    Codes of length 06 bits (002 total): 31 41 
+    Codes of length 07 bits (004 total): 06 13 51 61 
+    Codes of length 08 bits (003 total): 07 22 71 
+    Codes of length 09 bits (005 total): 14 32 81 91 A1 
+    Codes of length 10 bits (005 total): 08 23 42 B1 C1 
+    Codes of length 11 bits (004 total): 15 52 D1 F0 
+    Codes of length 12 bits (004 total): 24 33 62 72 
+    Codes of length 13 bits (000 total): 
+    Codes of length 14 bits (000 total): 
+    Codes of length 15 bits (001 total): 82 
+    Codes of length 16 bits (125 total): 09 0A 16 17 18 19 1A 25 26 27 28 29 2A 34 35 36 
+                                         37 38 39 3A 43 44 45 46 47 48 49 4A 53 54 55 56 
+                                         57 58 59 5A 63 64 65 66 67 68 69 6A 73 74 75 76 
+                                         77 78 79 7A 83 84 85 86 87 88 89 8A 92 93 94 95 
+                                         96 97 98 99 9A A2 A3 A4 A5 A6 A7 A8 A9 AA B2 B3 
+                                         B4 B5 B6 B7 B8 B9 BA C2 C3 C4 C5 C6 C7 C8 C9 CA 
+                                         D2 D3 D4 D5 D6 D7 D8 D9 DA E1 E2 E3 E4 E5 E6 E7 
+                                         E8 E9 EA F1 F2 F3 F4 F5 F6 F7 F8 F9 FA 
+    Total number of codes: 162
+
+  Expanded Form of Codes:
+    Codes of length 02 bits:
+      00 = 01                            (Total Len =  3)
+      01 = 02                            (Total Len =  4)
+    Codes of length 03 bits:
+      100 = 03                           (Total Len =  6)
+    Codes of length 04 bits:
+      1010 = 00 (EOB)                    (Total Len =  4)
+      1011 = 04                          (Total Len =  8)
+      1100 = 11                          (Total Len =  5)
+    Codes of length 05 bits:
+      11010 = 05                         (Total Len = 10)
+      11011 = 12                         (Total Len =  7)
+      11100 = 21                         (Total Len =  6)
+    Codes of length 06 bits:
+      111010 = 31                        (Total Len =  7)
+      111011 = 41                        (Total Len =  7)
+    Codes of length 07 bits:
+      1111000 = 06                       (Total Len = 13)
+      1111001 = 13                       (Total Len = 10)
+      1111010 = 51                       (Total Len =  8)
+      1111011 = 61                       (Total Len =  8)
+
+</pre>
+(etc, it goes on further)</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Thanks, glad to hear it is useful!<br>
+<br>
+The Total Length is the sum of the variable-length code value and the additional bits that follow the code. For example, let's take one of the "Codes of length 07 bits" <span class="value">1111001</span>. The 7-bit string <span class="value">1111001</span> represents code value 0x13, which means a run-length of 1 zeros followed by a 3 "additional bits". These additional bits define a value from -7..-4,+4..+7. So, in the actual scan segment, we may see a sequence like <span class="value">1111001 101</span> which is 10 bits total in length. Hope that helps!</td></tr>
+<tr><td width="60" class="cmt_list_date">2018-10-24</td><td class="cmt_list_row">Scott</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hello Calvin,<br>
+<br>
+First let me thank you for this comprehensive breakdown of Huffman Coding as it relates to JPEG, your overview of JPEG as a whole, and the the extremely convenient application, JPEGsnoop. I found this all VERY helpful.<br>
+<br>
+One thing I wanted to comment and/or ask about is the statement "Assuming that the gain of the DCT transform is 4... " <br>
+<br>
+I found this a little puzzling because there was no applying of the inverse quantization in your decoding step. Using JPEGsnoop you can see the luminance DC quantization value is 2. So wouldn't the assumed gain of the DCT be 8? <br>
+<br>
+Thanks again,<br>
+<br>
+Scott</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Scott -- you're right... I'm not certain where I may have derived the "gain of 4" as the DC quantization coefficient should be 2. Running JPEGsnoop one can see the luminance DCT table entry show a DC value of -1024 &amp; 2040, and the resulting RGB converted values of (0,0,0) &amp; (255,255,255).</td></tr>
+<tr><td width="60" class="cmt_list_date">2018-08-02</td><td class="cmt_list_row">GAGAN</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi,<br>
+I tried to obtain values of all MCU ex: an image with 16384 MCU's in it. But processing time took too long and application window is not responding.<br>
+So my question is their any way to obtain all the MCU's?<br>
+Help Me..<br>
+<br>
+Thanks in Advance</td></tr>
+<tr><td width="60" class="cmt_list_date">2018-04-20</td><td class="cmt_list_row">Ali</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi, <br>
+Your page information is more useful than books. Thanks a lot.<br>
+I was confused for AC zero coefficient and ZRL. Finally I understood, it may be useful for other friends. ZRL just is used for 16 zeroes before next AC coefficient. For less than 16 zeroes, the number of zeroes is in combination with bit number of AC coefficient. for example in Huffman table there is code "111011 = 13" that seem the code means thirteen but its not. It's 1 zero leading 3 bit number. :)<br>
+<br>
+Best Regards, Ali</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hey thanks for the positive review! :) Glad it was useful.</td></tr>
+<tr><td width="60" class="cmt_list_date">2018-01-15</td><td class="cmt_list_row">ENRICO</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi,<br>
+<br>
+I'm implementing a JPEG encoder in a microcontroller running at 48 MHz which has to JPEG encode 320x240 RGB images.<br>
+<br>
+Are the Huffman tables mandatory in the JPEG file?<br>
+<br>
+I'm asking this question because the bit stream size reduction that we get with the Huffmann process is little while the computation time to create the Huffmann tables is high.<br>
+<br>
+I really would like to skip the Huffman process.<br>
+<br>
+thank you,<br>
+Enrico</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Enrico --<br>
+<br>
+To my knowledge the baseline standard only supports either Huffman coding or arithmetic coding methods. When you say that the computation to create the tables is high, I presume you are referring to the generation of an optimized Huffman table based on your image content. If so, your encoder should be able to reuse a fixed Huffman table and still get some compression benefit while minimizing the effort in creating a custom table. For example, you could import the tables from Annex K in the ITU-T.81 standard (you can extract these from most JPEGs using JPEGsnoop).</td></tr>
+<tr><td width="60" class="cmt_list_date">2017-01-14</td><td class="cmt_list_row">Chad</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Ha, turned out my way of dealing with stuffed bytes had a bug; if I had FF 00 FF 00 XX and a Huffman code started in the first FF and ended on the first bit of the XX then I'd loose track of which bit I last read. Thanks for the link, it motivated me to reexamine stuff for the umpteenth time.<br>
+<br>
+Chad</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Excellent! Glad you managed to figure that out!</td></tr>
+<tr><td width="60" class="cmt_list_date">2016-12-23</td><td class="cmt_list_row">Chad</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">I don't know if you're familiar with the TIFF format but DNGs are basically an extension of the TIFF format to account for camera parameters. That said, my DNG images are broken up into several hundred smaller tiles that are embedded in the DNG. Each tile is its own self-contained Jpeg and while the standard's pretty open, mine are compressed using the lossless encoding from the original Jpeg standard (10918-1 / T.81) so it's very simple: made a prediction based on previously decoded samples and a few supplied equations, calculated the deviation from that tile's Huffman tables, add them to get the sample value, repeat. All the necessary markers are there so I don't think it's a tile padding issue and 95% of my tiles decode properly and look as I'd expect so I seem to be correctly handling the padding associated with 0xFF bytes in the compressed bit stream. I've also tried skipping 1-17 bits after encountering errors and different ways of handling the FF00FF00 codes but while some tries look less bad none fix it. I suppose I'll soon be digging into the Adobe DNG SDK, which I've been hoping to avoid. Again, thanks for the help.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Thanks for the clarification on how the DNGs work. The only thing that comes to mind is the JPEG decoder deviation referenced <a href="http://markmail.org/message/jga2uatlstznxkym">here</a>. Other than that, I'm not sure what you might be observing with that encoding scenario. Good luck and let me know if you happen to uncover the cause!</td></tr>
+<tr><td width="60" class="cmt_list_date">2016-12-23</td><td class="cmt_list_row">Usam</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hallo,<br>
+I'm implementig a jpeg-decoder and I'm now unsecure, because when I take the small example picture above you used for this tutorial in JPEGsnoop there are 2 QT and 4 Huffman-tables for that picture, however in the hex form of this file there is just one DQT and DHT segment. How it could be explained? Must not one DQT or DHT segment contain just one table?<br>
+<br>
+Regards<br>
+Usam</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Usam -- when you say there is only <em>one DQT and DHT segment in the hex for form of this file</em>, can you clarify which place you might be looking? (ie. the tutorial text or what you see in JPEGsnoop under the <span class="value">Marker: DQT</span> or <span class="value">Marker: DHT</span>)? Thanks!</td></tr>
+<tr><td width="60" class="cmt_list_date">2016-12-20</td><td class="cmt_list_row">Chad</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Just curious, do you know what to make of bit sequences that don't match any codes? I'm working with a DNG file where the individual tiles use a lossless jpeg encoding. Most decode properly but a few contain the hex sequence 0xFF 0x00 0xFF 0x00 so after removing the stuffed bytes I'm left with long strings of 1 bits that don't match any codes. Also, the files open and display properly in the Adobe software that converted them from RAW. Thanks and your site's already been a ton of help!</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Chad -- I haven't looked specifically at how DNG is encoded, but I am wondering if perhaps what you are observing is some additional fill bits/bytes at the end of each tile? This would be similar to how the JPEG RSTn (restart) markers need to pad up the bits to align to a byte boundary. I would be interested to know if you can correlate this invalid huffman code stream to a tile boundary. If you experiment with the number of bits to skip after you start the invalid sequence, are you able to regain sync again?</td></tr>
+<tr><td width="60" class="cmt_list_date">2016-04-21</td><td class="cmt_list_row">Blaire</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Clavin,<br>
+<br>
+Thank you for explanation! I was wondering if you could please also explain the Huffman Code Histogram stats? <br>
+<br>
+Thank you</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">The Huffman code histogram stats identifies how frequently each variable length [Huffman] code appears within the encoded image. If the encoder produced an optimum a huffman table, then the majority of the image would be created with shorter codes, which would result in larger percentage values for the code lengths near the top of the histogram list.</td></tr>
+<tr><td width="60" class="cmt_list_date">2016-01-31</td><td class="cmt_list_row">AS</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Please if anyone can help me with the code of huffman,i  m getting binary values after aplying the algorithm ,don't know how to convert it into an compressed image???plzz help</td></tr>
+<tr><td width="60" class="cmt_list_date">2015-11-02</td><td class="cmt_list_row">Michael</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Calvin, thank you much for your tutorial and examples!   I need to implement (or have implemented, let me know if you are interested in being paid to do it) a fairly efficient decoder for extracting just the greyscale DC value for each 8x8 block.     I am wondering if there is any reasonable way to jump to the start of each block (or end of previous block) - or if all of the codes must be parsed.     On quick glance, it looks to me like the EOB marker can only be found when it occurs in the context of next symbol to extract - not from a simple scan.   The application is to parse data in a microcontroller, with the data originating in an imager chip that is streaming jpeg compressed image.  I only want the 1/8 x 1/8 greyscale image.    Thx!</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Michael --<br>
+<br>
+Glad to hear the tutorial was useful! Extracting the luminance DC value for each block is certainly faster than decoding the full image, but unfortunately (as you've discovered) it is not particularly easy for a decoder to implement random-access to the encoded blocks in the general case. The EOB bit strings are almost always found at the end of an encoded block (if there are less than 63 AC elements after quantization), but unfortunately the bitstring for EOB (eg. 4'b1010) can alias with a great number of other huffman codes or their associated signed value. Therefore, jumping ahead can actually be quite a challenge. If the encoder can be configured to embed restart markers liberally throughout the image then the decoder can take advantage of these to perform some limited random access by searching for the RSTn codes.</td></tr>
+<tr><td width="60" class="cmt_list_date">2015-08-23</td><td class="cmt_list_row">louay</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">please can u give an example to decode if all AC components not zeros</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi -- I don't have an example file that would demonstrate a "full" set of AC components, but basically we would expect to see the DC component followed by 63 AC components (without the EOB code at the end).</td></tr>
+<tr><td width="60" class="cmt_list_date">2015-08-02</td><td class="cmt_list_row">Franz</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin,<br>
+<br>
+thanks for your research regarding my MCU database! Here are some thoughts on your answers:<br>
+<br>
+-  large key sizes: one could use SHA-1 checksums (20 bytes) for encoding the compressed MCU (approx. 31 bytes), which would save 1/3 of the filesize for a quality 90 JPEG file (however we should not forget the extremely large size of our hypothetical database and the fact that i can gain similar savings by reducing the jpeg quality with almost no effect on the visual quality of the image)<br>
+<br>
+- another idea would be not compress/index entire MCUs, but individual chroma/luma tables within the MCU (I suppose your calculation of up to 64 entries of about 10bits each refers to a table, not an entire MCU). However I think it is not possible to account for all table permutations, rather you have to use a prediction model like the one in AVC/H.264 (http://people.xiph.org/~xiphmont/demo/daala/demo2.shtml) to predict MCU tables based on the surrounding tables. It would be interesting to know if "backporting" such a feature to JPEG makes sense (e.g. in the form of a decoding preprocessor that restores the original MCU values before the decoding happens). At least it would be a lossless operation (re-encoding to another image format isn't)<br>
+<br>
+- btw, can you tell me why JPEGSnoop 1.7.3 reports 3 luminance tables in 1 MCU? http://pastebin.com/CjhDVtgu (lines 263- 336)</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Franz --<br>
+<br>
+Thanks for sharing your interesting ideas!<br>
+<br>
+<strong>Key size</strong>:<br>
+<ul>
+<li>Using cryptographic hashes (such as SHA-1) could potentially cut down on the lookup key / table size, but you would then also run the risk (very small, though) of having data corruption due to hash collisions. It is very unlikely that two real-world MCUs would produce the same hash, but it could be possible. If your transencoder mapped two different MCUs to the same hash key then you would corrupt during transdecode.</li>
+<li>As you mention, an increase in compression (eg. through increased quantization factors) could allow for significant reduction in storage size without perceptible image degradation. Some techniques have been used in optimizing this recompression (based on image content) to find the optimum balance between compression and error (according to the human visual system limitations).
+</li></ul>
+<br>
+<strong>Compressing chroma/luma tables</strong>:<br>
+<ul>
+<li>I'm not quite sure I understood the suggestion fully. Did you mean compress / create a lookup for the DQT / DHT tables? While there are a very wide range of possible DQT tables, the storage is very minimal (eg. 64 bytes for a DQT) and only appears once in the file. Perhaps I misunderstood the idea? Since the encoded MCUs can indeed be long and repeated throughout the image, it is conceivable that repeats could be identified and compressed further. However, it is unlikely in a natural "real-world" image to find such repeated MCUs.</li>
+<li>Thanks for providing the link to the AVC/H.264 encoding methodology -- it was a great read. Your idea of leveraging neighboring pixel elements in a JPEG post-encoder stage (or pre-decoder) is interesting. To a degree, I think something similar has been done with the arithmetic coding mode of JPEG. I have seen some software advertised that effectively transcodes an existing baseline JPEG into an arithmetic coded JPEG to gain further file size reduction. You might want to take a deeper look into that.</li>
+</ul>
+<br>
+<strong>3 Luminance tables</strong>:<br>
+<ul>
+<li>I assume you are referring to the 4 <span class="value">Lum (Tbl #0),</span> in the detailed Decode Scan? If so, the reason we see 4 luminance entries (MCUs) before the chrominance ones is that this particular image uses <a href="https://www.impulseadventure.com/photo/chroma-subsampling.html">chroma subsampling</a> to further the compression of the chrominance channels versus the luminance channels. In this case the image uses "2x2" subsampling which means that it has halved both the horizontal and vertical resolution in the chrominance, but kept the full resolution in the luminance channel. When encoding such an image, the actual MCU size is now 16 x 16 pixels (instead of 8x8). For that 256 pixel block, there are effectively 4 luminance MCUs and 1 chrominance MCU. The encoder records the luminance MCUs first before continuing on with the chrominance.</li>
+</ul></td></tr>
+<tr><td width="60" class="cmt_list_date">2015-07-26</td><td class="cmt_list_row">Franz</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin,<br>
+<br>
+recently I have been contemplating about an MCU "database". My idea is to generate all possible MCUs for a certain JPEG encoder setting (e.g. libjpeg, quality 80) and store them into a database. Then i would remove all MCU data from a JPEG file (which was encoded using the same settings) and replace it with links to my database.<br>
+<br>
+What I hope to achieve is a significant reduction in JPEG filesize without the drawbacks of encoding the file to another format (e.g. quality loss, incompatible tools). In fact, the original JPEG image could be restored by replacing the MCU database links with the actual MCU data.<br>
+<br>
+I am not sure if my idea is feasible, because it depends on a few assumptions (e.g. the average MCU size in bytes is not bigger than the database key that is needed to reference them =&gt; MCUs are "big" enough, not too many different MCUs). So I really appreciate your answers to the following questions:<br>
+<br>
+	- what is the average size of a MCU in bytes?<br>
+	- probability of duplicate MCUs in one image or across similar images (which were encoded using the same image encoder and JPEG quality settings)?<br>
+	- how many different MCUs can be produced/encoded with a certain JPEG encoder setting (say libjpeg, quality 80)? (if i approach the problem using pixel permutations, e.g. how many different 8x8 pixel/MCU tiles can be created in a 4-bit-grayscale image, i quickly end up with gazillions of possibilities. but maybe a quite an amount of permutations can be considered equal due to the DCT transform?)<br>
+	- could a partial solution be successful (e.g. ignore all MCUs with less than n bytes length)?<br>
+<br>
+Thanks,<br>
+<br>
+Franz</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Franz -- certainly a fascinating idea!<br>
+<br>
+It may take me some time to get some approximate statistics for you, but in the meantime, here is what I expect we'll find: (note that these are just quick thoughts, so I may need to rethink this again in more detail!)<br>
+<br>
+<ul>
+<li>Assuming you are handling "natural" JPEG images (ie. from real-world source material), it seems highly likely to me that the number of possible MCUs could be unrealistic to pre-calculate and index.</li>
+<li>We have to consider that the MCU (without subsampling) can be up to 64 entries long. To keep things simple, let's assume that the image doesn't use any ZRL in the matrices.</li>
+<li>The huffman codes typically provide up to 10 bits for the value field. So, at the simplest view, an MCU could have a range in permutations defined by 64 entries of 10 bits each. Given that order matters, this is an excessively large number of permutations! (is it 6x10^191?)</li>
+<li>If so, the lookup table would be immense, and the index key length would also be extremely large.</li>
+<li>As for the potential file savings, I just took an example real-world image that had a quality factor of 90. With 2x1 chroma subsampling, the average MCU length worked out to approx 31 bytes per MCU.</li>
+<li>Given real-world images, I expect that the chance of duplicate MCUs (even between files) could be very low, hampering the efforts to achieve the compression you're after</li>
+<li>Also, unless I misunderstood, the lookup table you're defining would be specific to a single huffman table. While there are some that are commonly used, this could present a challenge when dealing with existing encoded files (you would need to transcode first).</li>
+</ul></td></tr>
+<tr><td width="60" class="cmt_list_date">2015-07-07</td><td class="cmt_list_row">Bilal Maskaleh</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">I read some papers which discuss 16x16 DCT and quantization blocks instead of 8x8.<br>
+I'm trying to develop a 16x16 block JPEG encoder with a quantization table of 16x16 block.<br>
+the problem occurs when I'm trying to write the JFIF header of the file in the DQT (Define quantization table) part of the header. in my case the length is (256+3 = 259). after saving the image i cannot either read or show it on matlab or any other viewer. i used a tool to read the JFIF header, so i noticed that the 16x16 quantization table is divided into many 8x8 tables as shown in the image attached to this email.<br>
+ is there any way to read the (16x16) 256 elements from JFIF header as 1 block??</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Bilal --<br>
+<br>
+It's not quite clear, but are you trying to encode 16x16 pixel blocks with baseline JPEG using a quantization sampling factor of H=2,V=2? (ie. the 16x16 pixel blocks typically encoded when chroma subsampling is active). If so, the quantization table should still only contain 64 elements. I may be mistaken, but I didn't think JPEG T.81 (1992) was specified to support 256 (16x16) quantization coefficients.</td></tr>
+<tr><td width="60" class="cmt_list_date">2015-03-16</td><td class="cmt_list_row">Darlina</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hello, I have a couple of questions :<br>
+<br>
+I want to know if is it possible to detect all the DC in a JPEG image?<br>
+<br>
+I don't understand : "Note that the DC component is encoded as a relative value with respect to the DC component of the previous block. The first block in the JPEG image is assumed to have a previous block value of zero."<br>
+<br>
+Is the JPEG file a set of 64 pixels (block 8*8) or the size of each block depends on the number of deleted 0 ie (After the zig-zag process the 0 are removed from the block ?)</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Ignoring chroma subsampling for the moment, the JPEG image is always broken down into the 64-pixel (8x8) blocks. The number of "deleted 0s" doesn't affect the block size, but instead affects the number of AC components that are encoded in the resulting compressed bitstream. So, we take an 8x8 pixel block, perform the IDCT, and then encode the DC coefficient. The DC value (for the entire block) is encoded as a delta from the previous block's DC value. We then proceed to encode up to 63 AC coefficients by performing the zig-zag traversal through the matrix. We can then "delete 0s" by representing them with a run-length or else terminating early with an EOB. Hope that helps!</td></tr>
+<tr><td width="60" class="cmt_list_date">2015-03-14</td><td class="cmt_list_row">Shubhanka</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hello Sir, your pages are really the best source to understand JPEG in detail! Thanks.<br>
+In my implementation of JPEG Encoder, I sometimes (for some images) get 'bad huffman string' error while for some other images the compressed data becomes entirely different in comparison to the original image (For example, a red square becomes a green one!).  <br>
+In my huffman tables, the EOB marker for Luma components match with one of the huffman codes for Chroma AC components. Is this problem of huffman codes  because of such conflicts between huffman codes and end of block markers? Can you please provide some solution to this problem?<br>
+Thanks in advance.</td></tr>
+<tr><td width="60" class="cmt_list_date">2015-03-14</td><td class="cmt_list_row">Shubhanka</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hello Sir, Thanks for the valuable tutorial on JPEG Huffman Encoding.<br>
+I have one doubt that why standard software like MS-Paint, etc. change their huffman tables for different images. What I am trying to say is that, I took some images and saved them as .jpg files using MS-Paint. Then I examined each of those images using JPEGsnoop. The huffman tables displayed by JPEGsnoop were different for these images. Are these huffman tables static or do they change according to the content of the image (i.e. pixel values of image). <br>
+Can you please make this doubt clear and elaborate little more on Huffman coding tables. <br>
+Thanks in advance.</td></tr>
+<tr><td width="60" class="cmt_list_date">2014-11-19</td><td class="cmt_list_row">Prashant</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi...
+
+I am trying to develop JPEG decoder for my project.iam using ur jpeg tool to verify at each.it is really working fine.<br>
+<br>
+But after getting the DCT values which are perfectly matched with the tool out,then I am doing level shifting and then rgb conversion.the rgb values are not matching.i am using the formula<br>
+<br>
+R=Y+1.402(cr-128)<br>
+
+G=Y-0.34414(cb-128)-0.714(cr-128)<br>
+
+B=Y+1.772(cb-128)<br>
+
+<br>
+
+Please help<br>
+
+Thanks and regards</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Prashant -- you might want to see if the formula I have at the bottom of the <a href="https://www.impulseadventure.com/photo/jpeg-color-space.html">JPEG color conversion</a> page works better for you?
+</td></tr>
+<tr><td width="60" class="cmt_list_date">2014-10-29</td><td class="cmt_list_row">Amadou</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hello,<br>
+The article above is very helpful. Thank you for the tutorial. Could one have extracted the huffman tables from JPEG images using the original version of JPEGSnoop. Also, are you a professor or teacher? Feel free to send me an email. Many thanks.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Glad you found it useful! Yes, even the very first version (v0.1) of JPEGsnoop was able to extract both quantization and huffman tables. As for being a professor, no -- just someone with an interest in how things work :)</td></tr>
+<tr><td width="60" class="cmt_list_date">2014-05-14</td><td class="cmt_list_row">Ayman</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi, Thanks for this great tutorial, it is very helpful in my assignment. I am decoding a 64x64 real image, and I found this code from JPEGSnoop for the second non-zero AC coef<br>
+Codes of length 08 bits:<br>
+      11111000 = 14                      (Total Len = 12)<br>
+does it mean 1 zeros in in the location 2 of zigzag then 4-bit magnitude for the location 3?</td></tr>
+<tr><td width="60" class="cmt_list_date">2013-10-24</td><td class="cmt_list_row">Erkam Uzun</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin,<br>
+I want to ask about DRI(define restart interval) tag. When I look many of the jpegsnoop output it puts DRI tag info for some jpegs while it does not for others. And, after the DRI tag I see a length=4 and an interval=0 or 4 fields. Can you give me some details about reading these fields. In which field I must explore the length and interval value after I see a DRI tag? Second, if Jpegsnoop does not put a DRI tag info for a jepg file, does it mean there is no restart markers in the Jpeg file?<br>
+<br>
+Thanks.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Relatively few digicams use the "Restart Markers". It increases file size a little but does make the images more robust against errors. The length of 4 just indicates the length of the section in the file that indicates whether or not the markers exist. The interval (eg. 4) indicates how often the markers are to appear in the image data (the number of MCUs). If JPEGsnoop does not show a "Restart Interval" section in the report then there are no restart markers in the image data.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_row">
+<script type="text/javascript"><!--
+google_ad_client = "pub-2529752145788811";
+/* BannerCmtTxt */
+google_ad_slot = "1155211490";
+google_ad_width = 468;
+google_ad_height = 60;
+//-->
+</script>
+<script type="text/javascript" src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/f(1).txt">
+</script>
+</td></tr><tr><td width="60" class="cmt_list_date">2013-06-26</td><td class="cmt_list_row">Erkam</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin,<br>
+<br>
+I am confused about constructing Huffman codeword from intermediate sequence of the symbols created with zigzag scan. More detailed, for example, how  could we transform the luminance-AC zigzag scan symbol of "(zero count, size)--&gt;(1,2)" pair to a huffman code word. And, how could we reconstruct the symbol "(1,2)" from codeword.<br>
+<br>
+Thanks.</td></tr>
+<tr><td width="60" class="cmt_list_date">2013-05-06</td><td class="cmt_list_row">saydin</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi;<br>
+<br>
+I want to create raw data from MCU's which decompressed from JPEG image. How I put the MCU's, How must be order of MCU's?<br>
+<br>
+Thanks for these articles....</td></tr>
+<tr><td width="60" class="cmt_list_date">2013-03-02</td><td class="cmt_list_row">spirosbond</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin,<br>
+<br>
+Thanks for the article, but I have a question. With have no chroma subsampling you say that each block needing encoding is represented with the following sequence:<br>
+<br>
+Ydc_Yac_CBdc_CBac_CRdc_CRac<br>
+<br>
+What if we have subsampling? For example with [4 2 0] subsampling, for a 512x512 image we will end up with a<br>
+<br>
+512x512 Y table<br>
+256x256 Cb table and<br>
+256x256 Cr table<br>
+<br>
+How are we going to create the above sequence since the number of blocks of each table are not equal?<br>
+<br>
+Thanks a lot.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Good question. With chroma subsampling, the luminance components are encoded first (usually 1,2 or 4 blocks) followed by the chrominance components.<br>
+<br>
+So, in your example [4 2 0], we would have:<br>
+<br>
+Y11dc_Y11ac_Y12dc_Y12ac_Y21dc_Y21ac_Y22dc_Y22ac_CBdc_CBac_CRdc_CRac<br>
+... where Y11, Y12, Y21, Y22 represent the luminance of each16x16 block of pixels.</td></tr>
+<tr><td width="60" class="cmt_list_date">2013-01-27</td><td class="cmt_list_row">Mostapha.info</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Thanks a lot Calvin.</td></tr>
+<tr><td width="60" class="cmt_list_date">2012-08-08</td><td class="cmt_list_row">Carlos</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi, really enlightening article although i must admit quite tough for me to digest. You say that The huffman compression tables are encoded in a somewhat confusing manner. I'd like to be able to determine if huffman tables in a non viewable jpeg file are corrupt or not as a possible reason for the viewer not to open the file properly.<br>
+Could you tell me a little bit more about how these tables are encoded in a jpg file?.<br>
+Thank you so much for sharing your work with us.</td></tr>
+<tr><td width="60" class="cmt_list_date">2012-05-31</td><td class="cmt_list_row">Callum</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hello, excellent article. <br>
+<br>
+Regarding the DC coding: the DC value is the difference from the previous blocks' DC value. Does this mean it is the difference from the previous block in the bit sequence, or the previous block in the image (say left-to-right)? <br>
+<br>
+For example, for 4:2:0 sampling, the first four Y blocks actually span two 8x8 'rows' of the image:<br>
+<br>
+Y00 Y01 Y10 Y11 Cb Cr, ...<br>
+<br>
+Is the DC in each Y the difference from the one that preceded it in this sequence?<br>
+<br>
+Thanks again for all the info!</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">The differential encoding for the DC is done from the perspective of the previously-encoded DC block, not the visually-adjacent 8x8 block in the image.</td></tr>
+<tr><td width="60" class="cmt_list_date">2012-05-01</td><td class="cmt_list_row">chaitu</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">very nice article..may i knw wht is mean by ZRL and some explanation about it in detail</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">ZRL is "zero run length" -- it represents the number of zero coefficients before the next non-zero value. This is an easy means of compressing the coefficients in the DCT matrix since it is common to have zeros in some areas (eg. high frequency coefficients).</td></tr>
+<tr><td width="60" class="cmt_list_date">2012-04-20</td><td class="cmt_list_row">Wojtek</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin, <br>
+<br>
+I'm a programmer in one of scientific centers in Poland and I want to use a CR2 files from a Canon EOS 550D to receive datas from detectors. I have reviewed http://wildtramper.com/sw/cr2/cr2.html, http://lclevy.free.fr/cr2/ and some articles about Huffman coding and decoding (as Your) - I've written a software which can get out a Huffman Table an properly codes (the same as in Your JPEGSnoop). But I have a problem - after 0xFFDA marker and proper length compressed data is coded.<br>
+<br>
+From Huffman table there are:<br>
+<pre>00 = 0x06
+010 = 0x04
+011 = 0x08
+100 = 0x05
+101 = 0x07
+1100 = 0x03
+1101 = 0x09
+11100 = 0x00 (that is EOB)
+11101 = 0x0a
+11110 = 0x02
+111110 = 0x01
+1111110 = 0x0c
+11111110 = 0x0b
+111111110 = 0x0d
+1111111110 = 0x0e
+</pre>
+<br>
+The first 16 characters after 0xFFDA and length (0x0E) are:<br>
+<pre>ff 00 7f ff 00 fd fa ff 00 f7 eb ff 00 5d bf f2</pre>
+So it is (in binary):<br>
+<pre>11111111 00000000 01111111 1111111 00000000 11111101 11111010 11111111
+00000000 11110111 11101011 11111111 00000000 01011101 10111111 11110010</pre>
+But the 0xFF00 should be changed to 0xFF, so it should be:<br>
+<pre>ff 7f ff fd fa ff f7 eb ff 5d bf f2</pre>
+So it is (in binary):<br>
+<pre>11111111 01111111 1111111 11111101 11111010 11111111 11110111 11101011
+11111111 01011101 10111111 11110010</pre>
+And decoding should be:<br>
+First 11111111 0 is 0x0d,<br>
+but there is 1111111 1111111 111111 which doesn't match with any code from Huffman tree. What I should do?<br>
+Please write an e-mail to me so I can send You detailed data.<br>
+Best regards,<br>
+Wojtek</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Wojtek -- Unfortunately, I haven't really spent any time decoding lossless JPEG or raw files. The analysis you have shared looks on-track, assuming that your CR2 files don't have any additional headers or extra bytes interleaved in the Huffman coded stream and presumably using the correct DHT for the first image component.<br>
+<br>
+So, after the 0x0D code, I would expect that we'd find 13 bits for the value, ie. Diff[nBits] since nBits = 13. Were you trying to find a huffman code to match the Diff[nBits]? That could explain it. Following this value I think we'd proceed to the next huffman code which is 11111110, matching code 0x0B, etc.</td></tr>
+<tr><td width="60" class="cmt_list_date">2012-02-27</td><td class="cmt_list_row">VG</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hello,<br>
+<br>
+great explanation! And yes, the ITU T81 specification goes a curious way to explain the DHT Encoding... <br>
+<br>
+But you should change your diagramm of the huffman tree at "The diagram below shows the expansion of the first four rows...":<br>
+<br>
+The huffman tree of a DQT is defined as "left-orientied". Only because this additional definition is made, the given amounts of leafs per level and the leaf-values are sufficient to describe a complete huffman tree. The picture shows a right-orientied tree. <br>
+<br>
+Best regard from Stuttgart,<br>
+<br>
+VG</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Thank you very much VG!! It looks like I'll have to revisit the way I constructed the tree and update this. Thanks for pointing it out (it may take me a while to update with a baby taking much of my time these days! :)</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-12-28</td><td class="cmt_list_row">xchip</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi, <br>
+<br>
+First, thanks for such an awesome program and web page, I am about to finish a jpeg reader written in a bunch lines of python :-)<br>
+<br>
+There is something that escapes to my understanding... using the data below...  where is the 0xf0 that marks the ZRL in the last coefficient that I am pasting here?<br>
+<br>
+Again thanks thanks and thanks for making my dream of decoding a jpeg me myself come true :-)<br>
+<br>
+Expanded Form of Codes:<br>
+<span class="value">
+    Codes of length 02 bits:<br>
+      00 = 01                            (Total Len =  3)<br>
+      01 = 02                            (Total Len =  4)<br>
+    Codes of length 03 bits:<br>
+      100 = 03                           (Total Len =  6)<br>
+      101 = 04                           (Total Len =  7)<br>
+    Codes of length 04 bits:<br>
+      1100 = 05                          (Total Len =  9)<br>
+    Codes of length 05 bits:<br>
+      11010 = 00 (EOB)                   (Total Len =  5)<br>
+      11011 = 11                         (Total Len =  6)<br>
+      11100 = 06                         (Total Len = 11)<br>
+    Codes of length 06 bits:<br>
+      111010 = 12                        (Total Len =  8)<br>
+      111011 = 13                        (Total Len =  9)<br>
+    Codes of length 07 bits:<br>
+      1111000 = 21                       (Total Len =  8)<br>
+      1111001 = 31                       (Total Len =  8)<br>
+      1111010 = 41                       (Total Len =  8)<br>
+      1111011 = 61                       (Total Len =  8)<br>
+    Codes of length 08 bits:<br>
+      11111000 = 51                      (Total Len =  9)<br>
+      11111001 = 22                      (Total Len = 10)<br>
+      11111010 = 14                      (Total Len = 12)<br>
+      11111011 = 07                      (Total Len = 15)<br>
+    Codes of length 09 bits:<br>
+      111111000 = 71                     (Total Len = 10)<br>
+      111111001 = A1                     (Total Len = 10)<br>
+      111111010 = B1                     (Total Len = 10)<br>
+      111111011 = 32                     (Total Len = 11)<br>
+      111111100 = 42                     (Total Len = 11)<br>
+      111111101 = 82                     (Total Len = 11)<br>
+      111111110 = 23                     (Total Len = 12)<br>
+<br>
+<br>
+<br>
+   Lum (Tbl #0), MCU=[0,0]<br>
+      [0x0000015A.0]: ZRL=[ 0] Val=[   80] Coef=[00= DC] Data=[0x 68 59 AB 46 = 0b (01101000 0------- -------- --------)] <br>
+      [0x0000015B.1]: ZRL=[ 0] Val=[    9] Coef=[01..01] Data=[0x 59 AB 46 57 = 0b (-1011001 -------- -------- --------)] <br>
+      [0x0000015C.0]: ZRL=[ 0] Val=[  -10] Coef=[02..02] Data=[0x AB 46 57 EE = 0b (1010101- -------- -------- --------)] <br>
+      [0x0000015C.7]: ZRL=[ 0] Val=[  -14] Coef=[03..03] Data=[0x AB 46 57 EE = 0b (-------1 010001-- -------- --------)] <br>
+      [0x0000015D.6]: ZRL=[ 0] Val=[    5] Coef=[04..04] Data=[0x 46 57 EE 4C = 0b (------10 0101---- -------- --------)] <br>
+      [0x0000015E.4]: ZRL=[ 0] Val=[    3] Coef=[05..05] Data=[0x 57 EE 4C A5 = 0b (----0111 -------- -------- --------)] <br>
+      [0x0000015F.0]: ZRL=[ 1] Val=[    4] Coef=[06..07] Data=[0x EE 4C A5 25 = 0b (11101110 0------- -------- --------)] <br>
+</span>
+ <br>
+<br>
+decoding manually 11101110 0 I get that 111011 -&gt; 0x13 and not 0xf0!  <br>
+In fact there is no 0xf0 in any table I have... And 0x13 is 19 in dec which gives me a 19bits number which is veery big<br>
+<br>
+I am so close!!!! :-)</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-12-22</td><td class="cmt_list_row">Mali</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Really great article but I have few questions. When we finish with generating Huffman tables, and Quantization tables, we have to decode the data from file itself. Lets suppose I have 8x8 color picture, and my Luminance DC and 4 AC elements are populated. Chrominance(Cb) DC and 4 AC elements are also populated, but my all Chrominance (Cr) 8x8 block is populated (i hit EOB). Consideration my Luminance and Chrominance (Cb) blocks are not populated, and my Chrominance(Cr) is populated, how do I continue with reading file? I continue with: Luminance DC, Luminance AC Chrominance(Cb) DC, Chrominance(Cb) AC, Chrominance(Cr) DC, Chrominance (Cr) AC. Or  Luminance DC, Luminance AC Chrominance(Cb) DC, Chrominance(Cb) AC because my Chrominance(Cr) 8x8 block is populated?</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-11-28</td><td class="cmt_list_row">deepa</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">hi I have down loaded a huffman decoder vhdl code from opencore. it has given a test image for simulation  can anyone please tell me how can i use this code to decompress other jpg image?</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-11-10</td><td class="cmt_list_row">jpap</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Love your JPEG site and JPEGsnoop! :D<br>
+<br>
+In your experience, how many encoders/applications use a *different* Huffman code set (bits, huffval) than the example specified in Annex K of the ITU T.81 standard?<br>
+<br>
+How about applications that, by default, use an optimized code set, tailored to the image?  (e.g. mode of IJG libjpeg where the optimized Huffman code analysis is enabled.)<br>
+<br>
+jpap</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">I haven't seen many digicams that use a different set of Huffman tables, but then again I haven't specifically searched the data set for it. As for applications, I believe Photoshop can produce an optimized Huffman code set, but I'm not aware of digicam encoders doing this (might be processor intensive). Unfortunately, the database I have compiled does not include Huffman code tables, so I can't easily check for this.
+</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-09-26</td><td class="cmt_list_row">FYI</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">problem with cert at source forge when svn'ing source for JPEGsnoop...<br>
+<br>
+ svn co https://jpegsnoop.svn.sourceforge.net/svnroot/jpegsnoop jpegsnoop<br>
+Error validating server certificate for 'https://jpegsnoop.svn.sourceforge.net:443':<br>
+ - The certificate is not issued by a trusted authority. Use the<br>
+   fingerprint to validate the certificate manually!<br>
+Certificate information:<br>
+ - Hostname: *.svn.sourceforge.net<br>
+ - Valid: from Tue, 01 Feb 2011 03:25:10 GMT until Mon, 05 Mar 2012 04:22:59 GMT<br>
+ - Issuer: GeoTrust, Inc., US<br>
+ - Fingerprint: 94:74:b3:a9:54:ce:dc:e5:0d:d6:cf:86:b1:40:5a:48:b9:ea:15:de<br>
+(R)eject, accept (t)emporarily or accept (p)ermanently? r<br>
+svn: OPTIONS of 'https://jpegsnoop.svn.sourceforge.net/svnroot/jpegsnoop': Server certificate verification failed: issuer is not trusted (https://jpegsnoop.svn.sourceforge.net)<br>
+please check... thank you.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi there -- according to the sourceforge site, this message is often received after they have updated their certificate. Please see the "Server Certificate Verification Failed" section of the following page:<br>
+http://sourceforge.net/apps/trac/sourceforge/wiki/Subversion
+</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-08-27</td><td class="cmt_list_row">Bill</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Is there a tag somewhere that shows points to a different algorithm of decoding the huffman tree? In your 8x16 file, your algorithm works correctly. But if I look at another file as an unoptimized baseline jpeg the ORDER of the huffman codes with the SAME table are different.<br>
+<br>
+For example, in the YAC table, the 3 4-bit values are ordered 17, 4, 0 in your file and then in another they are 0, 4, 17. If you follow your left to right algorithm of assigning codes to leaf nodes, it will construct 2 totally different tables if the codes are in different order.<br>
+<br>
+I've noticed that a number of jpegs encode the tables in ascending order, which isn't always the correct order. So when decoding, it decodes an incorrect tree.<br>
+<br>
+Is there missing logic from how you construct the tree?</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-08-09</td><td class="cmt_list_row">Dan</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">I must be making some mistake, or I am missing something important. I've attempted to decode a few 8x8 blocks with AC values by hand, but I am not getting results that make sense.<br>
+<br>
+Is there a table for AC value encoding? (similar to table 5, but for AC values?). I am leaning towards this because you CAN have negative AC coefficients, as shown in the orange MCU figure. <br>
+<br>
+Much thanks for your help.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Yes, for the AC coefficient decode, you would first find the first huffman code (per AC DHT) that matches. Make sure you enable "DHT expand" to see the bitstrings. Once you have foudn the code that matches, you break down the two halves of the code into a ZRL and the number of value bits. You can then use Table 5 to determine the AC value (but ignore the ZRL portion of the code). In other words, if your AC huffman code is 0x24, then look for an entry in that table for 0x04. Hope that helps!</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-08-03</td><td class="cmt_list_row">Dan</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">I have a simple question, that I happen to be struggling with.<br>
+<br>
+Lets say theres an 8x8 block that has a colour change in it, lets say half red, half green. Now there will be AC components in the Luminance AND in the Chrominance, because of the changes. <br>
+<br>
+Will the decoding be as such:<br>
+<br>
+Y-DC:<br>
+-------<br>
+Code-&gt; use Table -&gt; get DC value<br>
+<br>
+Y-AC:<br>
+-------<br>
+Code (zero run/non-zero)<br>
+Code (zero run/non-zero)<br>
+.... until you reach EOB<br>
+<br>
+Cb-DC:<br>
+-------<br>
+Code-&gt; use Table -&gt; get DC value<br>
+<br>
+Cb-AC:<br>
+-------<br>
+Code (zero run/non-zero)<br>
+Code (zero run/non-zero)<br>
+.... until you reach EOB<br>
+<br>
+Cr-DC:<br>
+-------<br>
+Code-&gt; use Table -&gt; get DC value<br>
+<br>
+Cr-AC:<br>
+-------<br>
+Code (zero run/non-zero)<br>
+Code (zero run/non-zero)<br>
+.... until you reach EOB<br>
+<br>
+<br>
+Is this how iterations work?<br>
+<br>
+Much thanks in all your work putting the data out there.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Dan -- yes, that is essentially the way that it will work (assuming that there is no chroma subsampling). The "until EOB" can actually be "or 64 components". The transition in color will translate into a low-frequency component in the DCT domain.</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-07-17</td><td class="cmt_list_row">Nemo</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin,<br>
+<br>
+probably you might now the answer to this question:<br>
+<br>
+do jpegtran produce the best Huffman encoding (read the smallest possible file size)?<br>
+<br>
+The reason I'm asking this question is because PNG images usually can be further compressed, as shown here for instance:<br>
+<br>
+http://en.wikipedia.org/wiki/Wikipedia:Preparing_images_for_upload#PNG_tips</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Sorry, I'm not familiar enough with the different PNG compression schemes to give an educated comment.</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-06-29</td><td class="cmt_list_row">NASSER</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">There is any implemmentation for this issue using GPUs (OpenCL).<br>
+<br>
+Thanks</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-03-12</td><td class="cmt_list_row">Alessandro</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Thank you for that fast response, so it's just possible to decode the part of the image between 2 restart markers?<br>
+<br>
+The fastest way i've found is to use the imagemagick command line tool "stream" that can output a 1000x1000 region in 6 seconds from a 30000x30000 image.<br>
+<br>
+I've also tried to use java ImageReader that can extract the first block of an image in 200ms without using more then 50mb of ram, but that's only on the top-left part of the image, when it process the bottom-right part it goes much slower, near 15 seconds.<br>
+<br>
+I don't get how it works because if the image is bigger the top-left part is always done very fast.</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">The easiest solution that will work for all JPEG images is to perform the huffman decode but skip the IDCT, dequantization and color conversion. Have a look at the open-source jpegtran to see how this can be done. What you have observed with ImageReader implies that it is always decoding ht entire image (always starting from top-left corner). If what you are trying to extract is top-left, it will be much faster; but if you are trying to extract the bottom-right, it will need to decode the entire image first.</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-03-11</td><td class="cmt_list_row">Alessandro</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Thank you for this great article, i have to extract just a part of a jpeg, without decoding the whole image.<br>
+<br>
+You think is this possible just taking a part of the file and decode that?<br>
+<br>
+Thank you!</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">In general, no, it is not possible to decode just part of a file to decode (unless restart markers are inserted in the stream).
+</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-02-16</td><td class="cmt_list_row">sathananthan</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Thanks for this article! It makes JPEG a lot easier to understand! :-)<br>
+<br>
+On remark though: I had the impression Table 1 was complete, but, I think it is missing one entry:<br>
+8 bits 11111 110 0B</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Thanks Sathananthan... can you clarify the entry for me? I currently have (in Table 1):
+<pre>7 bits 	1111 110 	0A
+8 bits 	1111 1110 	0B
+</pre>
+What you have written "8 bits 11111 110 0B" appears to be the same as my last row. thx.</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-02-02</td><td class="cmt_list_row">Claudio Freitas</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hi Calvin,<br>
+<br>
+I think in the Table 2, the bits for the codes 21 and 12 are shifted. Just to let you know.<br>
+<br>
+Also, thank you very much for such informative tutorial!<br>
+Claudio Freitas</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hello Claudio -- thanks for pointing out the possible error. However, I re-ran JPEGsnoop DHT expansion on the sample image and I still get the same results for codes 21 and 12 in Table 2:<br>
+<pre>    Codes of length 05 bits:
+      11010 = 05                         (Total Len = 10)
+      11011 = 21                         (Total Len =  6)
+      11100 = 12                         (Total Len =  7)
+</pre>
+Can you clarify what values you were expecting? Thanks.</td></tr>
+<tr><td width="60" class="cmt_list_date">2011-01-24</td><td class="cmt_list_row">Gagan</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Very helpful tutorial, thanks lots :)<br>
+Any ideas on arithmetic encoding the dc and ac values?</td></tr>
+<tr><td width="60" class="cmt_list_date">2010-10-27</td><td class="cmt_list_row">Chris</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Excellent write up. I knew (when decoding an image) the Huffman Table built a B tree but I couldn't find how we assigned values to the leaf, of course now it seems obvious.<br>
+<br>
+Thank you.</td></tr>
+<tr><td width="60" class="cmt_list_date">2010-10-22</td><td class="cmt_list_row">nick</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_txt">Hello,<br>
+I know you must be busy answering JPEG questions all the time, so here's another one. I thought I had a firm grasp on Huffman coding, but apparently not. I noticed when I ran JPEG snoop that some of the Huffman bit lengths and values don't match up! Below is an example of what I'm talking about. How can "11" be a 4 bit value? 4 bit values can only pertain to the 2nd hex value in the string. "11" denotes 10001 which is 5 bits. Right? My confidence in understanding Huffman coding has been diminished. Care to clarify? I would appreciate any feedback! Thanks.<br>
+<pre>Codes of length 04 bits (003 total): 00 04 11</pre>
+Nick</td></tr>
+<tr><td>&nbsp;</td><td class="cmt_list_resp">Hi Nick -- What you are actually looking at is the list of Huffman Codes, not the Huffman bit-strings. To see the actual bit string that represents code "00", "04" and "11", enable "DHT Expand" mode under Options. This will then show you that these 3 Huffman codes each are represented by 4-bit binary strings. Hope that helps!</td></tr>
+</tbody></table>
+<p>&nbsp;</p>
+<hr>
+
+			  <form name="frm_comments" method="post" action="https://www.impulseadventure.com/comments-add.html">
+			  <table>
+			  <tbody><tr><td colspan="2"><a name="leave_comments"></a><h3>Leave a comment or suggestion for this page:</h3></td></tr>
+	
+			  <tr valign="top">
+			  <td align="right"><label for="nm">Name:</label></td>
+			  <td><input name="nm" type="text" value="" size="20" maxlength="60"></td>
+			  </tr>
+			  <tr valign="top">
+			  <td align="right"><label for="ml">Email:</label></td>
+			  <td><input name="ml" type="text" value="" size="30" maxlength="40">(<strong>Never Shown</strong> - Optional)</td>
+			  </tr>
+			  <tr valign="top">
+			  <td align="right"><label for="cm">Comments:</label></td>
+			  <td><textarea name="cm" cols="60" rows="8"></textarea></td>
+			  </tr>
+			  <tr valign="top">
+			  <td>&nbsp;</td><td><input name="Submit" type="submit" value="Submit"></td></tr></tbody></table>
+			  <input name="sc" type="hidden" value="991">
+			  <input name="seq" type="hidden" value="b5db4ea3c3">
+			  <input name="seqt" type="hidden" value="5e8b3a2f">
+			  <input name="seqi" type="hidden" value="11fd2b45d">
+			  <input name="type" type="hidden" value="comment">
+			  </form>
+									  
+			</div>
+	<!-- Reader Section End -->
+
+				<p class="style1"></p>
+<!-- Start of StatCounter Code for Default Guide -->
+<script type="text/javascript">
+var sc_project=476684; 
+var sc_invisible=0; 
+var sc_security=""; 
+var sc_https=1; 
+var sc_remove_link=1; 
+var scJsHost = (("https:" == document.location.protocol) ?
+"https://secure." : "http://www.");
+document.write("<sc"+"ript type='text/javascript' src='" +
+scJsHost+
+"statcounter.com/counter/counter.js'></"+"script>");
+</script><script type="text/javascript" src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/counter.js.הורדה"></script><span class="statcounter"><img src="./ImpulseAdventure - JPEG Huffman Coding Tutorial_files/t.php" alt="StatCounter - Free Web Tracker and Counter" border="0"></span>
+
+<noscript><div class="statcounter"><img class="statcounter"
+src="//c.statcounter.com/476684/0//0/" alt="Web
+Analytics"></div></noscript>Visits!
+<!-- End of StatCounter Code for Default Guide -->	
+				  
+		  </div>
+		</div>
+		<br style="clear:both;">
+	</div>
+	<!-- end .two-colA -->
+</div>
+<!-- end #content -->
+<div class="bg6" id="footer">
+	<p id="links" class="style1"><a href="https://www.impulseadventure.com/photo/jpeg-huffman-coding.html#">Back to Top</a> &nbsp;|&nbsp; 
+<a href="javascript:window.external.AddFavorite(&#39;https://www.impulseadventure.com&#39;,&#39;ImpulseAdventure&#39;)">Bookmark</a></p>
+	<p id="copyright" class="style1">Copyright © 2018 Calvin Hass. All rights reserved.</p>
+</div>	
+	
+
+<!-- InstanceEnd -->
+</body></html>
