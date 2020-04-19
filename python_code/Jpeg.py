@@ -1,12 +1,14 @@
 from python_code.marker_parsers.Sof0Parser import Sof0Parser
 from python_code.marker_parsers.dht_parser import DhtParser
 from python_code.marker_parsers.dqt_parser import DqtParser
+from python_code.marker_parsers.eoi_parser import EoiParser
 from python_code.marker_parsers.sos_parser import SosParser
 
 
 class Jpeg:
     def __init__(self, jpeg_file_path):
         self._mcu_list = []
+        self._exists_eoi = False
 
         jpeg_file = open(jpeg_file_path, 'rb')
         self._jpg_data = jpeg_file.read()
@@ -17,7 +19,8 @@ class Jpeg:
                 0xc4: DhtParser,
                 0xda: SosParser,
                 0xdb: DqtParser,
-                0xc0: Sof0Parser
+                0xc0: Sof0Parser,
+                0xd9: EoiParser
             }
 
         self._markers_to_skip = { 0xe1 }
@@ -41,5 +44,5 @@ class Jpeg:
                     raise Exception(f"no marker of type {hex(marker_type)} implemented!")
 
                 parser = self._marker_parsers[marker_type]()
-                is_continue = parser.parse(self._jpg_data[idx_in_file + 4: idx_in_file + 2 + marker_size])
-            idx_in_file += (2 + marker_size)
+                is_continue = parser.parse(self, self._jpg_data[idx_in_file + 4: idx_in_file + 2 + marker_size])
+            idx_in_file += (2 + marker_size) # This is including the size and not including the 0xYY marker (so 4-2=2).

@@ -1,3 +1,3 @@
 class IParser:
-    def parse(self, raw_marker):
+    def parse(self, jpg, raw_marker):
         raise NotImplementedError()

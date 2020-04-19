@@ -1,0 +1,3 @@
+* How do you know the size of the encoded data after SOS?
+
+* Can there be multiple SOSs? SOF0s?

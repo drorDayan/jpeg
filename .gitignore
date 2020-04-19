@@ -360,7 +360,7 @@ MigrationBackup/
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 
 __pycache__/
-venv/
+#venv/
 # User-specific stuff
 .idea/**/workspace.xml
 .idea/**/tasks.xml
@@ -537,9 +537,9 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+#.venv
 env/
-venv/
+#venv/
 ENV/
 env.bak/
 venv.bak/

@@ -1,0 +1,15 @@
+*Diff between JPG and JPEG: https://www.keycdn.com/support/difference-between-jpg-and-jpeg
+
+* To help resiliency in the case of data corruption,
+the JPEG standard allows JPEG markers to appear in the huffman-coded scan data segment.
+Therefore, a JPEG decoder must watch out for any marker (as indicated by the 0xFF byte, followed by a non-zero byte).
+If the huffman coding scheme needed to write a 0xFF byte, then it writes a 0xFF followed by a 0x00 -- a process known as adding a stuff byte.
+
+* MCU is a sub-image, usually 8*8 pixels. The variation (may be 16*8/ 16*16) is due to chrome subsampling
+(https://www.impulseadventure.com/photo/chroma-subsampling.html),
+https://www.impulseadventure.com/photo/jpeg-minimum-coded-unit.html
+
+* General JPG compression page: https://www.impulseadventure.com/photo/jpeg-compression.html
+
+* Note that the DC component is encoded as a relative value with respect to the DC component of the previous block.
+The first block in the JPEG image is assumed to have a previous block value of zero.
