@@ -8,6 +8,8 @@ from marker_parsers.sos_parser import SosParser
 class Jpeg:
     def __init__(self, jpeg_file_path):
         self._mcu_list = []
+        self._huffman_table_list = []
+        self._quantization_tables = {}
         self._exists_eoi = False
 
         jpeg_file = open(jpeg_file_path, 'rb')
@@ -23,7 +25,10 @@ class Jpeg:
                 0xd9: EoiParser
             }
 
-        self._markers_to_skip = { 0xe1 }
+        self._markers_to_skip = {
+            0xe1,
+            0xea
+        }
 
     def parse(self):
         print("Started parsing!")
@@ -46,3 +51,14 @@ class Jpeg:
                 parser = self._marker_parsers[marker_type]()
                 is_continue = parser.parse(self, self._jpg_data[idx_in_file + 4: idx_in_file + 2 + marker_size])
             idx_in_file += (2 + marker_size) # This is including the size and not including the 0xYY marker (so 4-2=2).
+
+    def add_huffman_table(self, huffman_table_to_add):
+        # TODO make sure this is not a duplicate?
+        self._huffman_table_list.append(huffman_table_to_add)
+
+    def add_quantization_table(self, table_id, quantization_table_to_add):
+        if table_id in self._quantization_tables:
+            print("error quantization table with this id exists")
+            return False
+        self._quantization_tables[table_id] = quantization_table_to_add
+        return True
