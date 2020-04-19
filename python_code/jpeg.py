@@ -1,4 +1,4 @@
-from marker_parsers.Sof0Parser import Sof0Parser
+from marker_parsers.sof0_parser import Sof0Parser
 from marker_parsers.dht_parser import DhtParser
 from marker_parsers.dqt_parser import DqtParser
 from marker_parsers.eoi_parser import EoiParser
@@ -23,7 +23,12 @@ class Jpeg:
                 0xd9: EoiParser
             }
 
-        self._markers_to_skip = { 0xe1 }
+        '''
+        .jpg_ignore:
+        DRI
+        APPn, n>=1
+        '''
+        self._markers_to_skip = { i for i in range(0xe1, 0xef+1) }  | {0xdd}
 
     def parse(self):
         print("Started parsing!")

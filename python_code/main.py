@@ -1,4 +1,4 @@
-from Jpeg import Jpeg
+from jpeg import Jpeg
 
 if __name__ == '__main__':
     print('gal')
