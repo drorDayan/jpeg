@@ -10,6 +10,8 @@ class Jpeg:
         self._mcu_list = []
         self._huffman_table_list = []
         self._quantization_tables = {}
+        self._height = None
+        self._width = None
         self._exists_eoi = False
 
         jpeg_file = open(jpeg_file_path, 'rb')
@@ -64,3 +66,7 @@ class Jpeg:
             return False
         self._quantization_tables[table_id] = quantization_table_to_add
         return True
+
+    def set_height_and_width(self, height, width):
+        self._height = height
+        self._width = width
