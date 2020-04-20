@@ -9,12 +9,12 @@ class DqtParser(IParser):
         while idx < len(raw_marker):
             table_length = raw_marker[idx] & 0xf0
             if table_length == 0:
-                table_length = 64
+                table_length = 64  # I'm not sure about this part. Shouldn't it be 8 bits so one byte?
             else:
-                print("this is a new one, handle this please")
-            table_id = raw_marker[idx] & 0x0f
+                print("this is a new one, handle this please") # Why? it means percision is 16, doesnt it?
+            table_id = raw_marker[idx] & 0x0f  # Can only be a value from 0 to 3?
             idx += 1
-            new_table = list(raw_marker[idx:idx+table_length])
+            new_table = list(raw_marker[idx:idx+table_length]) # The bits/bytes seems wrong to me.
             idx += table_length
             if not jpg.add_quantization_table(table_id, new_table):
                 return False
