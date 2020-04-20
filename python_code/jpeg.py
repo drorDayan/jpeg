@@ -1,8 +1,10 @@
 from marker_parsers.sof0_parser import Sof0Parser
-from marker_parsers.dht_parser import DhtParser
+from marker_parsers.dht_parser import DhtParser, HuffTable
 from marker_parsers.dqt_parser import DqtParser
 from marker_parsers.eoi_parser import EoiParser
 from marker_parsers.sos_parser import SosParser
+
+from dataclasses import dataclass
 
 
 class Jpeg:
@@ -15,10 +17,13 @@ class Jpeg:
         self._component_id_to_sample_factors = {}
         self._exists_eoi = False
 
+        # TODO check whether the code works or not for min != 1
         self._min_vertical_sample_factor = None
         self._max_vertical_sample_factor = None
         self._min_horizontal_sample_factor = None
         self._max_horizontal_sample_factor = None
+
+        self._number_of_items_per_mcu = 0
         self._height = None
         self._width = None
         self._mcu_list = []
@@ -103,13 +108,14 @@ class Jpeg:
         self._component_id_to_sample_factors[component_id] = sample_factors
         return True
 
+    @dataclass
     class ComponentMetadata:
-        def __init__(self, ac_t, dc_t, q_t, horizontal_sample_factor, vertical_sample_factor):
-            self.ac_huffman_table = ac_t
-            self.dc_huffman_table = dc_t
-            self.quantization_table = q_t
-            self.horizontal_sample_factor = horizontal_sample_factor
-            self.vertical_sample_factor = vertical_sample_factor
+        ac_huffman_table: HuffTable
+        dc_huffman_table: HuffTable
+        quantization_table: []
+        horizontal_sample_factor: int
+        vertical_sample_factor: int
+        number_of_instances_in_mcu: int
 
     '''This function collects all data related to specific components into one CONVENIENT data structure
     we need to do this because the metadata of each component is the indexes of tables
@@ -121,9 +127,15 @@ class Jpeg:
             q_t = self._quantization_tables[self._component_id_to_quantization_table_id[comp_id]]
             horizontal_sample_factor, vertical_sample_factor = self._component_id_to_sample_factors[comp_id]
             self._components[comp_id] = Jpeg.ComponentMetadata(
-                ac_t, dc_t, q_t, horizontal_sample_factor, vertical_sample_factor)
+                ac_t, dc_t, q_t, horizontal_sample_factor, vertical_sample_factor, 0)
 
         self._min_vertical_sample_factor = min([comp.vertical_sample_factor for comp in self._components.values()])
         self._max_vertical_sample_factor = max([comp.vertical_sample_factor for comp in self._components.values()])
         self._min_horizontal_sample_factor = min([comp.horizontal_sample_factor for comp in self._components.values()])
         self._max_horizontal_sample_factor = max([comp.horizontal_sample_factor for comp in self._components.values()])
+
+        for comp in self._components.values():
+            comp.number_of_instances_in_mcu = \
+                comp.horizontal_sample_factor//self._min_horizontal_sample_factor \
+                * comp.vertical_sample_factor//self._min_vertical_sample_factor
+            self._number_of_items_per_mcu += comp.number_of_instances_in_mcu
