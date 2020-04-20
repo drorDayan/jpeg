@@ -50,7 +50,9 @@ class Jpeg:
         self._markers_to_skip = {i for i in range(0xe1, 0xef + 1)} | {0xdd}
 
     def parse(self):
+        # DROR all prints here should be debug
         print("Started parsing!")
+        # DROR what are this consts? and are they full i.e. exif and jfif
         if self._jpg_data[0] != 0xff or self._jpg_data[1] != 0xd8:
             raise Exception("Illegal SOI")
 
@@ -79,7 +81,7 @@ class Jpeg:
         is_dc = huff_table.get_is_dc()
         huffman_tables = self._dc_huffman_tables if is_dc else self._ac_huffman_tables
         if table_id in huffman_tables.keys():
-            raise Exception("error quantization table with this id exists")
+            raise Exception("error quantization table with this id exists")  # DROR "quantization table" really?
 
         huffman_tables[table_id] = huff_table
 
