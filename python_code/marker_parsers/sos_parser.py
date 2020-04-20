@@ -1,8 +1,10 @@
+from jpeg_common import *
 from marker_parsers.i_parser import IParser
 
 
 class SosParser(IParser):
     def parse(self, jpg, raw_marker):
+        debug_print("Sos parser started")
         if raw_marker[0] < 1 or raw_marker[0] > 4:
             raise Exception("Illegal number of components in SOS")
         num_components = raw_marker[0]
@@ -18,4 +20,5 @@ class SosParser(IParser):
             idx += 2
 
         assert len(raw_marker) - 3 == idx, "File SOS must contain 3 ignore bytes"
+        debug_print("Sos parser ended successfully")
         return False
