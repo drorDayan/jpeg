@@ -1,3 +1,4 @@
+from jpeg_common import debug_print
 from marker_parsers.i_parser import IParser
 
 
@@ -6,7 +7,7 @@ class HuffTree:
         self._value = value
         self._successors = {}
 
-    def have_kids(self):  # DROR naming
+    def have_kids(self):
         assert (len(self._successors) == 0)
         left = HuffTree()
         right = HuffTree()
@@ -39,33 +40,38 @@ class HuffTable:
 
     def get_table_id(self):
         return self._table_num
-    # DROR don't we need a possibility to get a value from that tree?
+
+    def get_tree(self):
+        return self._tree
 
 
 class DhtParser(IParser):
-    def parse(self, jpg, raw_chunk):  # DROR raw_chunk is called raw_marker in all other files
+    max_symbol_length = 16
+    max_num_symbols = 256
+    def parse(self, jpg, raw_marker):
         idx = 0
-        while idx < len(raw_chunk):
+        while idx < len(raw_marker):
             # Start parsing a new table
-            ht_info = raw_chunk[idx]
-            table_num = ht_info & ((1 << 4) - 1)  # DROR look at DQT line 10 for example
-            is_dc = ht_info & (1 << 4) > 0  # DROR look at DQT line 10 for example
+            ht_info = raw_marker[idx]
+            table_num = ht_info & 0x0F
+            is_dc = (ht_info & 0x10) > 0
 
             idx += 1
-            symbols_of_length = raw_chunk[idx: idx + 16]  # DROR this 16 should be a const
-            if (sum(symbols_of_length)) > 256:  # DROR this 256 might need to be a const
+            symbols_of_length = raw_marker[idx: idx + self.max_symbol_length]
+            if (sum(symbols_of_length)) > self.max_num_symbols:
                 raise Exception("Illegal Huffman table")
 
             idx += 16
-            symbols_part_length = sum(symbols_of_length)  # DROR you use the sum twice, y?
-            symbols_part = raw_chunk[idx: idx + symbols_part_length]
+            symbols_part_length = sum(symbols_of_length)
+            symbols_part = raw_marker[idx: idx + symbols_part_length]
             huff_tree = self.generate_huff_tree(symbols_of_length, symbols_part)
             huff_table = HuffTable(table_num, is_dc, huff_tree)
-            jpg.add_huffman_table(huff_table)  # DROR you used exceptions while I used return values, we should be consistent
+            jpg.add_huffman_table(huff_table)
             idx += symbols_part_length
-        # DROR either use debug or remove
-        print("I'm a DHT parser!")
+
+        debug_print("I'm a DHT parser!")
         return True
+
 
     def generate_huff_tree(self, symbols_of_length, symbols_part):
         root = HuffTree()
