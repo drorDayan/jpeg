@@ -7,7 +7,7 @@ class HuffTree:
         self._value = value
         self._successors = {}
 
-    def have_kids(self):
+    def create_empty_kids(self):
         assert (len(self._successors) == 0)
         left = HuffTree()
         right = HuffTree()
@@ -48,7 +48,9 @@ class HuffTable:
 class DhtParser(IParser):
     max_symbol_length = 16
     max_num_symbols = 256
+
     def parse(self, jpg, raw_marker):
+        debug_print("DHT parser started")
         idx = 0
         while idx < len(raw_marker):
             # Start parsing a new table
@@ -69,28 +71,29 @@ class DhtParser(IParser):
             jpg.add_huffman_table(huff_table)
             idx += symbols_part_length
 
-        debug_print("I'm a DHT parser!")
+        debug_print("DHT parser ended successfully")
         return True
 
-
-    def generate_huff_tree(self, symbols_of_length, symbols_part):
+    @staticmethod
+    def generate_huff_tree(symbols_of_length, symbols_part):
         root = HuffTree()
-        root.have_kids()
+        root.create_empty_kids()
 
         symbol_idx = 0
 
         nodes_to_develop = [root.get_kid(0), root.get_kid(1)]
 
-        for tree_level in range(1, 16 + 1):
-            num_values = symbols_of_length[tree_level - 1]
+        for tree_level in range(16):
+            num_values = symbols_of_length[tree_level]
             for n_val in range(num_values):
                 nodes_to_develop[n_val].set_value(symbols_part[symbol_idx + n_val])
             symbol_idx += num_values
 
             new_parents = nodes_to_develop[num_values:]
-            [new_parent.have_kids() for new_parent in new_parents]
+            [new_parent.create_empty_kids() for new_parent in new_parents]
             nodes_to_develop = [kid for parent in new_parents for kid in parent.get_kids()]
 
+            # this optimization is to prevent a full tree build when we only use part of it's levels
             if symbol_idx == len(symbols_part):
                 break
 

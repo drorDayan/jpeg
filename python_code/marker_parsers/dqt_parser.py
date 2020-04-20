@@ -7,16 +7,18 @@ class DqtParser(IParser):
         debug_print("DQT parser started")
         idx = 0
         while idx < len(raw_marker):
-            table_length = raw_marker[idx] & 0xf0
-            if table_length == 0:
-                table_length = 64  # I'm not sure about this part. Shouldn't it be 8 bits so one byte?
+            # bits 4-7 are precision, 0 is 8 bits, otherwise 16 bit
+            precision = raw_marker[idx] & 0xf0
+            if precision == 0:
+                table_length = 64
             else:
-                print("this is a new one, handle this please") # Why? it means percision is 16, doesnt it?
-            table_id = raw_marker[idx] & 0x0f  # Can only be a value from 0 to 3?
+                raise Exception("this is a new one, handle this please")
+            table_id = raw_marker[idx] & 0x0f
+            if table_id > 3:
+                raise Exception("illegal table_id")
             idx += 1
-            new_table = list(raw_marker[idx:idx+table_length]) # The bits/bytes seems wrong to me.
+            new_table = list(raw_marker[idx:idx+table_length])
             idx += table_length
-            if not jpg.add_quantization_table(table_id, new_table):
-                return False
+            jpg.add_quantization_table(table_id, new_table)
         debug_print("DQT parser ended successfully")
         return True
