@@ -48,6 +48,7 @@ class HuffTable:
 class DhtParser(IParser):
     max_symbol_length = 16
     max_num_symbols = 256
+
     def parse(self, jpg, raw_marker):
         idx = 0
         while idx < len(raw_marker):
@@ -71,7 +72,6 @@ class DhtParser(IParser):
 
         debug_print("I'm a DHT parser!")
         return True
-
 
     def generate_huff_tree(self, symbols_of_length, symbols_part):
         root = HuffTree()
