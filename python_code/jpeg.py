@@ -110,6 +110,12 @@ class Jpeg:
         self._component_id_to_sample_factors[component_id] = sample_factors
         return True
 
+    def add_component_huffman_table(self, comp_id, ac_table, dc_table):
+        if comp_id in self._component_id_to_huffman_tables_ids.keys():
+            print("Error: component ID already has huffman tables assigned to it")
+            return False
+        self._component_id_to_huffman_tables_ids[comp_id] = (ac_table, dc_table)
+
     @dataclass
     class ComponentMetadata:
         ac_huffman_table: HuffTable

@@ -13,9 +13,9 @@ class SosParser(IParser):
             comp_id = raw_marker[idx]
             ac_table = raw_marker[idx + 1] & 0x0F
             dc_table = (raw_marker[idx + 1] & 0xF0) >> 4
-            # DROR _component_id_to_huffman_tables_ids is protected
-            jpg._component_id_to_huffman_tables_ids[comp_id] = (ac_table, dc_table)
+
+            jpg.add_component_huffman_table(comp_id, ac_table, dc_table)
             idx += 2
 
-        assert(len(raw_marker) - 3 == idx)  # DROR this should be documented
+        assert len(raw_marker) - 3 == idx, "File SOS must contain 3 ignore bytes"
         return False
