@@ -31,8 +31,9 @@ class Sof0Parser(IParser):
             horizontal_sample_factor = (sample_factor & 0xf0) >> 4
             vertical_sample_factor = sample_factor & 0x0f
             quantization_table_id = raw_marker[Sof0Parser.component_data_idx + i*Sof0Parser.single_component_data_len+2]
-            if not 1 <= quantization_table_id <= 4:
-                raise Exception("illegal quantization_table_id")
+    # TODO DROR
+    #        if not 1 <= quantization_table_id <= 4:
+    #            raise Exception("illegal quantization_table_id")
 
             jpg.add_component_quantization_table(comp_id, quantization_table_id)
             jpg.add_component_sample_factors(comp_id, (horizontal_sample_factor, vertical_sample_factor))

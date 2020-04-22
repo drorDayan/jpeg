@@ -1,3 +1,4 @@
+from encoded_data_decoder import RawDataDecoder
 from marker_parsers.sof0_parser import Sof0Parser
 from marker_parsers.dht_parser import DhtParser, HuffTable
 from marker_parsers.dqt_parser import DqtParser
@@ -74,7 +75,14 @@ class Jpeg:
                 is_continue = parser.parse(self, self._jpg_data[start_idx: start_idx + marker_size - 2])
             idx_in_file += (2 + marker_size)  # This is including the size and not including the 0xYY marker (so 4-2=2).
         self.finalize_metadata()
+        self.decode_raw_data(idx_in_file)
         debug_print("Parsing completed!")
+
+    def decode_raw_data(self, start_idx):
+        decoder = RawDataDecoder()
+        decoder.decode(self._jpg_data[start_idx:], self._components)
+        '''return the idx where data ended. it should be aligned to a byte as of the ignore bytes'''
+        raise Exception('Miamo gal')
 
     def add_huffman_table(self, huff_table):
         table_id = huff_table.get_table_id()

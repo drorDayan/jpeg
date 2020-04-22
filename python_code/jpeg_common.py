@@ -2,6 +2,9 @@
 use_debug_print = True
 
 
-def debug_print(*arg):
+def debug_print(*arg, newline=True):
     if use_debug_print:
-        print(arg)
+        if newline:
+            print(*arg)
+        if not newline:
+            print(*arg, end= " ")
