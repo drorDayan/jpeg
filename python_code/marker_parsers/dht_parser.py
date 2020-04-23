@@ -56,7 +56,9 @@ class DhtParser(IParser):
             # Start parsing a new table
             ht_info = raw_marker[idx]
             table_num = ht_info & 0x0F
-            is_dc = (ht_info & 0x10) > 0
+            is_dc = (ht_info & 0x10) == 0
+            if (ht_info & 0b11100000) != 0:
+                raise Exception("Illegal Huffman Table information byte")
 
             idx += 1
             symbols_of_length = raw_marker[idx: idx + self.max_symbol_length]

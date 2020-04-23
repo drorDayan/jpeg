@@ -75,19 +75,32 @@ class RawDataDecoder:
                     decoded_mcu = self.decode_component_mcu(bit_reader, comp.ac_huffman_table, comp.dc_huffman_table)
                     self._decoded_mcu_list.append(decoded_mcu)
 
+        '''
+        TODO:
+        * Implement byte reader so FF00 -> FF and FFx for x >0 -> exception for Dror to handle upupu
+        * impl the rest of decode - group mcus that describe the same place inthe pic (should be groups of sum(comp.num_instance_mcu))
+        * when time: unquantize, de-DCT and de-Ycbcr in order to get RGB. THen tell dror to do bmp header because he is so
+        * smarty pants and knows about headers of bmp.....
+        '''
+        # don't forget to absolutify dc values
 
-        #don't forget to absolutify dc values
+    @staticmethod
+    def decode_with_huffman(bit_reader, huff_tree):
+        debug_print("Reading bits: ", newline=False)
+        while not huff_tree.is_leaf():
+            next_bit = bit_reader.read(bool, 1)[0]
+            debug_print('1' if next_bit else '0', newline=False)
+            huff_tree = huff_tree.get_kid(1 if next_bit else 0)
+        code = huff_tree.get_value()
+        debug_print("")
+        return code
 
     def decode_component_mcu(self, bit_reader, ac_huffman, dc_huffman):
         dc_tree = dc_huffman.get_tree()
         debug_print('Decoding DC')
-        while not dc_tree.is_leaf():
-            next_bit = bit_reader.read(bool, 1)[0]
-            debug_print('1' if next_bit else '0', newline=False)
-            dc_tree = dc_tree.get_kid(1 if next_bit else 0)
-        dc_code = dc_tree.get_value()
+        dc_code = self.decode_with_huffman(bit_reader, dc_tree)
         debug_print('DC code is ', hex(dc_code))
-        assert(dc_code <= 0x0F)
+        assert (dc_code <= 0x0F)
         additional_bits = read_bits(dc_code, bit_reader)
 
         dc_value = dc_value_encoding(dc_code, additional_bits)
@@ -97,27 +110,39 @@ class RawDataDecoder:
         decoded_mcu = np.zeros((8, 8))
         put_value_in_matrix_zigzag(decoded_mcu, dc_value, decoded_idx)
         decoded_idx += 1
+        debug_print('Decoding AC')
 
         while decoded_idx < 64:
             ac_tree = ac_huffman.get_tree()
-            while not ac_tree.is_leaf():
-                next_bit = bit_reader.read(bool, 1)
-                ac_tree.get_kid(1 if next_bit else 0)
-            ac_code = ac_tree.get_value()
+
+            ac_code = self.decode_with_huffman(bit_reader, ac_tree)
             run_length = (ac_code & 0xF0) >> 4
             size = ac_code & 0x0F
+            debug_print(f"ac code = {ac_code}, which is ({run_length}, {size})")
             if run_length == 0 and size == 0:
                 # This is EOB. No more (we start with a zero matrix)
+                debug_print("EOB")
                 break
             elif run_length == 15 and size == 0:
                 decoded_idx += 16
+                debug_print("ZRL")
                 # This is ZRL
                 continue
             else:
+                if run_length > 0:
+                    debug_print(f"Putting {run_length} zero AC values")
+                for i in range(run_length):
+                    put_value_in_matrix_zigzag(decoded_mcu, 0, decoded_idx)
+                    decoded_idx += 1
                 value_aux = read_bits(size, bit_reader)
+                debug_print(f"additional bits = {value_aux}")
+
                 ac_value = dc_value_encoding(size, value_aux)
+                debug_print(f"ac value = {ac_value}")
                 put_value_in_matrix_zigzag(decoded_mcu, ac_value, decoded_idx)
                 decoded_idx += 1
+
+        debug_print('Done decoding MCU')
 
         print(decoded_mcu)
         return decoded_mcu
