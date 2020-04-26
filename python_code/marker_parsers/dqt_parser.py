@@ -1,3 +1,5 @@
+import numpy
+
 from marker_parsers.i_parser import IParser
 from jpeg_common import *
 
@@ -17,7 +19,10 @@ class DqtParser(IParser):
             if table_id > 3:
                 raise Exception("illegal table_id")
             idx += 1
-            new_table = list(raw_marker[idx:idx+table_length])
+
+            new_table = numpy.zeros((8,8))
+            for i in range(table_length):
+                new_table[i // 8, i % 8] = raw_marker[idx+i]
             idx += table_length
             jpg.add_quantization_table(table_id, new_table)
         debug_print("DQT parser ended successfully")

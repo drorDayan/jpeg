@@ -76,7 +76,6 @@ class DhtParser(IParser):
         debug_print("DHT parser ended successfully")
         return True
 
-
     @staticmethod
     def generate_huff_tree(symbols_of_length, symbols_part):
         root = HuffTree()

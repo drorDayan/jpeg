@@ -5,11 +5,12 @@ This is table 5
 # <dc_code> is decoding result gotten by using the huffman tree. <additional_bits> is the <dc_code> that follow right
 # after <dc_code> is 8 bits (0..7), <additional_bit> is at most 16 bits (0..15)
 # TODO check if it works :O
-import bitstream
 
 # 0 <= n <= 63
 import numpy as np
+import scipy as scipy
 
+from jpeg_bit_reader import JpegBitReader
 from jpeg_common import debug_print
 
 
@@ -50,7 +51,7 @@ def dc_value_encoding(dc_code: int, additional_bits: int):
 def read_bits(num_bits, bit_reader):
     val = 0
     for i in range(num_bits):
-        next_bit = bit_reader.read(bool, 1)
+        next_bit = bit_reader.get_bits_as_bool_list(1)[0]
         val = val * 2 + (1 if next_bit else 0)
     return val
 
@@ -61,25 +62,70 @@ def put_value_in_matrix_zigzag(matrix, value, index):
     debug_print(f"MCU: putting {value} in ({row},{col})")
 
 
+class McuParsedDctComponents:
+    def __init__(self):
+        self.raw_mcus = {i: [] for i in range(1, 4)}
+        self.dequantized_mcus = {i: [] for i in range(1, 4)}
+        self.mcus_after_idct = {i: [] for i in range(1, 4)}
+
+    def add_mcu(self, comp_id, mcu):
+        self.raw_mcus[comp_id].append(mcu)
+
+
 class RawDataDecoder:
     def __init__(self):
         self._decoded_mcu_list = []
 
-    def decode(self, raw_data, components):
-        bit_reader = bitstream.BitStream(raw_data)
+    def read_raw_mcus(self, bit_reader, components, n_mcu_horiz, n_mcu_vert):
         idx = 0
-        more_mcus_to_read = True
-        while more_mcus_to_read:
+        while idx < n_mcu_horiz * n_mcu_vert:
+            if idx > 0:
+                break
+            debug_print(f"Decoding MCU #{idx}")
+            parsed_mcu = McuParsedDctComponents()
+
             for (comp_id, comp) in components.items():
                 for comp_no in range(comp.number_of_instances_in_mcu):
                     decoded_mcu = self.decode_component_mcu(bit_reader, comp.ac_huffman_table, comp.dc_huffman_table)
-                    self._decoded_mcu_list.append(decoded_mcu)
+                    parsed_mcu.add_mcu(comp_id, decoded_mcu)
+            self._decoded_mcu_list.append(parsed_mcu)
 
+            idx += 1
+
+    def de_quantize(self, components):
+        debug_print("Beginning De-quantization")
+        for decoded_mcu in self._decoded_mcu_list:
+            for (comp_id, comp) in components.items():
+                quantization_table = comp.quantization_table
+                debug_print("Quantization table:")
+                debug_print(quantization_table)
+                for comp_mcu in decoded_mcu.raw_mcus[comp_id]:
+                    debug_print("Quantized:")
+                    debug_print(comp_mcu)
+                    de_quantized_mcu = np.multiply(quantization_table, comp_mcu)
+                    debug_print("Dequantized:")
+                    debug_print(de_quantized_mcu)
+                    decoded_mcu.dequantized_mcus[comp_id].append(de_quantized_mcu)
+
+    def do_idct(self, components):
+        for decoded_mcu in self._decoded_mcu_list:
+            for (comp_id, comp) in components.items():
+                for comp_mcu in decoded_mcu.raw_mcus[comp_id]:
+                    after_idct = scipy.fft.idct(comp_mcu)
+                    debug_print("AFTER IDCT")
+                    debug_print(after_idct)
+                    decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
+
+    def decode(self, raw_data, components, n_mcu_horiz, n_mcu_vert):
+
+        bit_reader = JpegBitReader(raw_data)
+        self.read_raw_mcus(bit_reader, components, n_mcu_horiz, n_mcu_vert)
+        self.de_quantize(components)
+        self.do_idct(components)
         '''
         TODO:
-        * Implement byte reader so FF00 -> FF and FFx for x >0 -> exception for Dror to handle upupu
         * impl the rest of decode - group mcus that describe the same place inthe pic (should be groups of sum(comp.num_instance_mcu))
-        * when time: unquantize, de-DCT and de-Ycbcr in order to get RGB. THen tell dror to do bmp header because he is so
+        * when time: de-DCT and de-Ycbcr in order to get RGB. THen tell dror to do bmp header because he is so
         * smarty pants and knows about headers of bmp.....
         '''
         # don't forget to absolutify dc values
@@ -88,7 +134,7 @@ class RawDataDecoder:
     def decode_with_huffman(bit_reader, huff_tree):
         debug_print("Reading bits: ", newline=False)
         while not huff_tree.is_leaf():
-            next_bit = bit_reader.read(bool, 1)[0]
+            next_bit = bit_reader.get_bits_as_bool_list(1)[0]
             debug_print('1' if next_bit else '0', newline=False)
             huff_tree = huff_tree.get_kid(1 if next_bit else 0)
         code = huff_tree.get_value()

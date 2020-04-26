@@ -1,3 +1,5 @@
+import math
+
 from encoded_data_decoder import RawDataDecoder
 from marker_parsers.sof0_parser import Sof0Parser
 from marker_parsers.dht_parser import DhtParser, HuffTable
@@ -24,6 +26,12 @@ class Jpeg:
         self._max_vertical_sample_factor = None
         self._min_horizontal_sample_factor = None
         self._max_horizontal_sample_factor = None
+
+        self._parsed_mcu_num_horizontal_pixels = None
+        self._parsed_mcu_num_vertical_pixels = None
+
+        self._num_mcus_horizontal = None
+        self._num_mcus_vertical = None
 
         self._number_of_items_per_mcu = 0
         self._height = None
@@ -80,9 +88,8 @@ class Jpeg:
 
     def decode_raw_data(self, start_idx):
         decoder = RawDataDecoder()
-        decoder.decode(self._jpg_data[start_idx:], self._components)
+        decoder.decode(self._jpg_data[start_idx:], self._components, self._num_mcus_horizontal, self._num_mcus_vertical)
         '''return the idx where data ended. it should be aligned to a byte as of the ignore bytes'''
-        raise Exception('Miamo gal')
 
     def add_huffman_table(self, huff_table):
         table_id = huff_table.get_table_id()
@@ -152,5 +159,19 @@ class Jpeg:
                 * comp.vertical_sample_factor//self._min_vertical_sample_factor
             self._number_of_items_per_mcu += comp.number_of_instances_in_mcu
 
+        assert(self._max_horizontal_sample_factor % self._min_horizontal_sample_factor == 0)
+        assert(self._max_vertical_sample_factor & self._min_vertical_sample_factor == 0)
+
+        self._parsed_mcu_num_horizontal_pixels = 8 * self._max_horizontal_sample_factor//self._min_horizontal_sample_factor
+        self._parsed_mcu_num_vertical_pixels = 8 * self._max_vertical_sample_factor//self._min_vertical_sample_factor
+
+        debug_print(f"Parsed MCU size: {self._parsed_mcu_num_horizontal_pixels} over {self._parsed_mcu_num_vertical_pixels} pixels")
+
+        self._num_mcus_horizontal = math.ceil(float(self._width) / self._parsed_mcu_num_horizontal_pixels)
+        self._num_mcus_vertical = math.ceil(float(self._height) / self._parsed_mcu_num_vertical_pixels)
+
+        debug_print(f"Image is {self._height}*{self._width}, and so we will encounter {self._num_mcus_vertical}*{self._num_mcus_horizontal} MCUs")
+
         for comp in self._components.items():
             debug_print("comp num ", comp[0], "has the following data", comp[1])
+
