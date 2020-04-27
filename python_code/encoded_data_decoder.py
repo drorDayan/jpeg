@@ -71,11 +71,15 @@ class McuParsedDctComponents:
     def add_mcu(self, comp_id, mcu):
         self.raw_mcus[comp_id].append(mcu)
 
+class UnsmearedMcu:
+    def __init__(self):
+        self.color_components = {i : None for i in range(3)}
 
 class RawDataDecoder:
     def __init__(self):
         self._decoded_mcu_list = []
-
+        self._unsmeared_mcu_matrix = {}  #will be (i,j) -> triplet of 8*8 numpy matrix of ycbcr
+        self._rgb_matrix = {} #will be (i,j) ->triplet 8*8 numpy matrix of rgbs
     def read_raw_mcus(self, bit_reader, components, n_mcu_horiz, n_mcu_vert):
         idx = 0
         while idx < n_mcu_horiz * n_mcu_vert:
@@ -116,12 +120,15 @@ class RawDataDecoder:
                     debug_print(after_idct)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
 
-    def decode(self, raw_data, components, n_mcu_horiz, n_mcu_vert):
+    def decode(self, raw_data, components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_verti):
 
         bit_reader = JpegBitReader(raw_data)
         self.read_raw_mcus(bit_reader, components, n_mcu_horiz, n_mcu_vert)
+        self.absoultify_dc_values()
         self.de_quantize(components)
         self.do_idct(components)
+        self.unsmear_mcus(components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_verti)
+
         '''
         TODO:
         * impl the rest of decode - group mcus that describe the same place inthe pic (should be groups of sum(comp.num_instance_mcu))
@@ -192,3 +199,51 @@ class RawDataDecoder:
 
         print(decoded_mcu)
         return decoded_mcu
+
+    def absoultify_dc_values(self):
+        print("Hey what about me?")
+
+    def unsmear_mcus(self, components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_verti):
+        decoded_mcu_idx = 0
+        while decoded_mcu_idx < len(self._decoded_mcu_list):
+            num_unsmeared_horiz = pixels_mcu_horiz // 8
+            num_unsmeared_verti = pixels_mcu_verti // 8
+            assert(1 <= num_unsmeared_horiz <= 2 and 1 <= num_unsmeared_verti <= 2)
+            decoded_mcu = self._decoded_mcu_list[decoded_mcu_idx]
+            y_mcus = decoded_mcu.mcus_after_idct[1]
+            cb_mcus = decoded_mcu.mcus_after_idct[2]
+            cr_mcus = decoded_mcu.mcus_after_idct[3]
+            assert len(cb_mcus) == 1 and len(cr_mcus) == 1
+            for horiz_idx in range(num_unsmeared_horiz):
+                for vert_idx in range(num_unsmeared_verti):
+                    unsmeared = UnsmearedMcu()
+                    y_mcu = y_mcus[num_unsmeared_horiz * vert_idx + horiz_idx]
+                    unsmeared.color_components[0] = y_mcu
+
+                    horiz_start_offset = (8 // num_unsmeared_horiz) * horiz_idx
+                    vert_start_offset = (8 // num_unsmeared_verti) * vert_idx
+
+
+                    def fill_up_unsmeared(orig, horiz_start_offset, vert_start_offset):
+                        mat = np.zeros((8,8))
+                        for h in range(8):
+                            for v in range(8):
+                                h_idx = horiz_start_offset + h // 2
+                                v_idx = vert_start_offset + v // 2
+                                mat[h,v] = orig[h_idx, v_idx]
+                        return mat
+
+                    cb_unsmeared = fill_up_unsmeared(cb_mcus[0], horiz_start_offset, vert_start_offset)
+                    unsmeared.color_components[1] = cb_unsmeared
+
+                    cr_unsmeared = fill_up_unsmeared(cr_mcus[0], horiz_start_offset, vert_start_offset)
+                    unsmeared.color_components[2] = cr_unsmeared
+
+
+                    horiz_unsmeared_idx = (decoded_mcu_idx % num_unsmeared_horiz) * (pixels_mcu_horiz // 8) + horiz_idx
+                    verti_unsmeared_idx = (decoded_mcu_idx // num_unsmeared_horiz) * (pixels_mcu_verti // 8) + vert_idx
+                    self._unsmeared_mcu_matrix[horiz_unsmeared_idx,verti_unsmeared_idx] = unsmeared
+
+            decoded_mcu_idx += 1
+
+        debug_print("Done unsmearing")

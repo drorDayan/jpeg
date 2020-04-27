@@ -88,7 +88,7 @@ class Jpeg:
 
     def decode_raw_data(self, start_idx):
         decoder = RawDataDecoder()
-        decoder.decode(self._jpg_data[start_idx:], self._components, self._num_mcus_horizontal, self._num_mcus_vertical)
+        decoder.decode(self._jpg_data[start_idx:], self._components, self._num_mcus_horizontal, self._num_mcus_vertical, self._parsed_mcu_num_horizontal_pixels, self._parsed_mcu_num_vertical_pixels)
         '''return the idx where data ended. it should be aligned to a byte as of the ignore bytes'''
 
     def add_huffman_table(self, huff_table):
