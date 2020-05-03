@@ -1,26 +1,10 @@
-"""
-This is table 5
-"""
-
-# <dc_code> is decoding result gotten by using the huffman tree. <additional_bits> is the <dc_code> that follow right
-# after <dc_code> is 8 bits (0..7), <additional_bit> is at most 16 bits (0..15)
-# TODO check if it works :O
-
-# 0 <= n <= 63
 import numpy as np
 import scipy as scipy
 
+from bmp_writer import BmpWriter
 from jpeg_bit_reader import JpegBitReader
 from jpeg_common import debug_print
 
-
-def zig_zag_value(i, j, n=8):
-    # upper side of interval
-    if i + j >= n:
-        return n * n - 1 - zig_zag_value(n - 1 - i, n - 1 - j, n)
-    # lower side of interval
-    k = (i + j) * (i + j + 1) // 2
-    return k + i if (i + j) & 1 else k + j
 
 
 def zig_zag_index(k, n=8):
@@ -71,15 +55,22 @@ class McuParsedDctComponents:
     def add_mcu(self, comp_id, mcu):
         self.raw_mcus[comp_id].append(mcu)
 
+
 class UnsmearedMcu:
     def __init__(self):
-        self.color_components = {i : None for i in range(3)}
+        self.color_components = {i: None for i in range(3)}
+
 
 class RawDataDecoder:
     def __init__(self):
         self._decoded_mcu_list = []
-        self._unsmeared_mcu_matrix = {}  #will be (i,j) -> triplet of 8*8 numpy matrix of ycbcr
-        self._rgb_matrix = {} #will be (i,j) ->triplet 8*8 numpy matrix of rgbs
+        self._unsmeared_mcu_matrix = {}  # will be (i,j) -> triplet of 8*8 numpy matrix of ycbcr
+        self._rgb_matrix = {}  # will be (i,j) ->triplet 8*8 numpy matrix of rgbs
+
+        self.Cred = 0.299
+        self.Cgreen = 0.587
+        self.Cblue = 0.114
+
     def read_raw_mcus(self, bit_reader, components, n_mcu_horiz, n_mcu_vert):
         idx = 0
         while idx < n_mcu_horiz * n_mcu_vert:
@@ -128,12 +119,16 @@ class RawDataDecoder:
         self.de_quantize(components)
         self.do_idct(components)
         self.unsmear_mcus(components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_verti)
+        self._to_rgb()
+
+        bmp_writer = BmpWriter()
+        bmp_writer.write_from_rgb(self._rgb_matrix, width=n_mcu_horiz*pixels_mcu_horiz, height=n_mcu_vert*pixels_mcu_verti)
 
         '''
         TODO:
-        * impl the rest of decode - group mcus that describe the same place inthe pic (should be groups of sum(comp.num_instance_mcu))
-        * when time: de-DCT and de-Ycbcr in order to get RGB. THen tell dror to do bmp header because he is so
-        * smarty pants and knows about headers of bmp.....
+        * merge unsmeared mcu to a single matrix per color component
+        * finish bmp scanning with bigbig matrix
+        
         '''
         # don't forget to absolutify dc values
 
@@ -208,7 +203,7 @@ class RawDataDecoder:
         while decoded_mcu_idx < len(self._decoded_mcu_list):
             num_unsmeared_horiz = pixels_mcu_horiz // 8
             num_unsmeared_verti = pixels_mcu_verti // 8
-            assert(1 <= num_unsmeared_horiz <= 2 and 1 <= num_unsmeared_verti <= 2)
+            assert (1 <= num_unsmeared_horiz <= 2 and 1 <= num_unsmeared_verti <= 2)
             decoded_mcu = self._decoded_mcu_list[decoded_mcu_idx]
             y_mcus = decoded_mcu.mcus_after_idct[1]
             cb_mcus = decoded_mcu.mcus_after_idct[2]
@@ -223,14 +218,13 @@ class RawDataDecoder:
                     horiz_start_offset = (8 // num_unsmeared_horiz) * horiz_idx
                     vert_start_offset = (8 // num_unsmeared_verti) * vert_idx
 
-
                     def fill_up_unsmeared(orig, horiz_start_offset, vert_start_offset):
-                        mat = np.zeros((8,8))
+                        mat = np.zeros((8, 8))
                         for h in range(8):
                             for v in range(8):
                                 h_idx = horiz_start_offset + h // 2
                                 v_idx = vert_start_offset + v // 2
-                                mat[h,v] = orig[h_idx, v_idx]
+                                mat[h, v] = orig[h_idx, v_idx]
                         return mat
 
                     cb_unsmeared = fill_up_unsmeared(cb_mcus[0], horiz_start_offset, vert_start_offset)
@@ -239,11 +233,30 @@ class RawDataDecoder:
                     cr_unsmeared = fill_up_unsmeared(cr_mcus[0], horiz_start_offset, vert_start_offset)
                     unsmeared.color_components[2] = cr_unsmeared
 
-
                     horiz_unsmeared_idx = (decoded_mcu_idx % num_unsmeared_horiz) * (pixels_mcu_horiz // 8) + horiz_idx
                     verti_unsmeared_idx = (decoded_mcu_idx // num_unsmeared_horiz) * (pixels_mcu_verti // 8) + vert_idx
-                    self._unsmeared_mcu_matrix[horiz_unsmeared_idx,verti_unsmeared_idx] = unsmeared
+                    self._unsmeared_mcu_matrix[horiz_unsmeared_idx, verti_unsmeared_idx] = unsmeared
 
             decoded_mcu_idx += 1
 
         debug_print("Done unsmearing")
+
+    def _to_rgb(self):
+        def get_rgb_from_ycbcr(y, cb, cr):
+            r = cr * (2-2*self.Cred) + y
+            b = cb * ( 2 - 2* self.Cblue) + y
+            g = (y - self.Cblue * b - self.Cred * r) / self.Cgreen
+            return r,g,b
+
+        for (i,j), y_cb_cr_mat in self._unsmeared_mcu_matrix.items():
+            self._rgb_matrix[i,j] = {i : np.zeros((8,8)) for i in range(3)}
+            for row in range(8):
+                for col in range(8):
+                    new_colors = get_rgb_from_ycbcr(*[y_cb_cr_mat.color_components[i][row, col] for i in range(3)])
+
+
+                    for p in range(3):
+                        self._rgb_matrix[i,j][p][row,col] = new_colors[p] + 128
+                        assert(0 <= new_colors[p] + 128 <= 255)
+
+        debug_print("Done YCbCr -> RGB transformation")

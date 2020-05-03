@@ -57,7 +57,7 @@ class Jpeg:
         DRI
         APPn, n>=1
         '''
-        self._markers_to_skip = {i for i in range(0xe1, 0xef + 1)} | {0xdd}
+        self._markers_to_skip = {i for i in range(0xe1, 0xef + 1)} | {0xdd} | {0xe0}
 
     def parse(self):
         debug_print("Started parsing!")
@@ -160,7 +160,7 @@ class Jpeg:
             self._number_of_items_per_mcu += comp.number_of_instances_in_mcu
 
         assert(self._max_horizontal_sample_factor % self._min_horizontal_sample_factor == 0)
-        assert(self._max_vertical_sample_factor & self._min_vertical_sample_factor == 0)
+        assert(self._max_vertical_sample_factor % self._min_vertical_sample_factor == 0)
 
         self._parsed_mcu_num_horizontal_pixels = 8 * self._max_horizontal_sample_factor//self._min_horizontal_sample_factor
         self._parsed_mcu_num_vertical_pixels = 8 * self._max_vertical_sample_factor//self._min_vertical_sample_factor
