@@ -1,10 +1,11 @@
+import itertools
+
 import numpy as np
 import scipy as scipy
 
 from bmp_writer import BmpWriter
 from jpeg_bit_reader import JpegBitReader
 from jpeg_common import debug_print
-
 
 
 def zig_zag_index(k, n=8):
@@ -57,8 +58,8 @@ class McuParsedDctComponents:
 
 
 class UnsmearedMcu:
-    def __init__(self):
-        self.color_components = {i: None for i in range(3)}
+    def __init__(self, color_components):
+        self.color_components = color_components
 
 
 class RawDataDecoder:
@@ -107,7 +108,7 @@ class RawDataDecoder:
             for (comp_id, comp) in components.items():
                 for comp_mcu in decoded_mcu.raw_mcus[comp_id]:
                     after_idct = scipy.fft.idct(comp_mcu)
-                    debug_print("AFTER IDCT")
+                    debug_print("After IDCT:")
                     debug_print(after_idct)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
 
@@ -122,7 +123,8 @@ class RawDataDecoder:
         self._to_rgb()
 
         bmp_writer = BmpWriter()
-        bmp_writer.write_from_rgb(self._rgb_matrix, width=n_mcu_horiz*pixels_mcu_horiz, height=n_mcu_vert*pixels_mcu_verti)
+        bmp_writer.write_from_rgb(self._rgb_matrix, width=n_mcu_horiz * pixels_mcu_horiz,
+                                  height=n_mcu_vert * pixels_mcu_verti)
 
         '''
         TODO:
@@ -166,7 +168,7 @@ class RawDataDecoder:
             ac_code = self.decode_with_huffman(bit_reader, ac_tree)
             run_length = (ac_code & 0xF0) >> 4
             size = ac_code & 0x0F
-            debug_print(f"ac code = {ac_code}, which is ({run_length}, {size})")
+            debug_print(f"AC code = {ac_code}, which is ({run_length}, {size})")
             if run_length == 0 and size == 0:
                 # This is EOB. No more (we start with a zero matrix)
                 debug_print("EOB")
@@ -186,7 +188,7 @@ class RawDataDecoder:
                 debug_print(f"additional bits = {value_aux}")
 
                 ac_value = dc_value_encoding(size, value_aux)
-                debug_print(f"ac value = {ac_value}")
+                debug_print(f"AC value = {ac_value}")
                 put_value_in_matrix_zigzag(decoded_mcu, ac_value, decoded_idx)
                 decoded_idx += 1
 
@@ -196,46 +198,41 @@ class RawDataDecoder:
         return decoded_mcu
 
     def absoultify_dc_values(self):
-        print("Hey what about me?")
+        print("Yo what about me?")
 
     def unsmear_mcus(self, components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_verti):
         decoded_mcu_idx = 0
+        num_unsmeared_horiz = pixels_mcu_horiz // 8
+        num_unsmeared_verti = pixels_mcu_verti // 8
+        assert (1 <= num_unsmeared_horiz <= 2 and 1 <= num_unsmeared_verti <= 2)
+
         while decoded_mcu_idx < len(self._decoded_mcu_list):
-            num_unsmeared_horiz = pixels_mcu_horiz // 8
-            num_unsmeared_verti = pixels_mcu_verti // 8
-            assert (1 <= num_unsmeared_horiz <= 2 and 1 <= num_unsmeared_verti <= 2)
+
             decoded_mcu = self._decoded_mcu_list[decoded_mcu_idx]
-            y_mcus = decoded_mcu.mcus_after_idct[1]
-            cb_mcus = decoded_mcu.mcus_after_idct[2]
-            cr_mcus = decoded_mcu.mcus_after_idct[3]
-            assert len(cb_mcus) == 1 and len(cr_mcus) == 1
-            for horiz_idx in range(num_unsmeared_horiz):
-                for vert_idx in range(num_unsmeared_verti):
-                    unsmeared = UnsmearedMcu()
-                    y_mcu = y_mcus[num_unsmeared_horiz * vert_idx + horiz_idx]
-                    unsmeared.color_components[0] = y_mcu
+            assert all(len(decoded_mcu.mcus_after_idct[i]) == 1 for i in range(2, 4))
+            for horiz_idx, vert_idx in itertools.product(range(num_unsmeared_horiz), range(num_unsmeared_verti)):
+                y_mcu = decoded_mcu.mcus_after_idct[1][num_unsmeared_horiz * vert_idx + horiz_idx]
 
-                    horiz_start_offset = (8 // num_unsmeared_horiz) * horiz_idx
-                    vert_start_offset = (8 // num_unsmeared_verti) * vert_idx
+                def fill_up_unsmeared(orig, horiz_start_offset, vert_start_offset):
+                    mat = np.zeros((8, 8))
+                    for h, v in itertools.product(range(8), range(8)):
+                        h_idx = horiz_start_offset + h // 2
+                        v_idx = vert_start_offset + v // 2
+                        mat[h, v] = orig[h_idx, v_idx]
+                    return mat
 
-                    def fill_up_unsmeared(orig, horiz_start_offset, vert_start_offset):
-                        mat = np.zeros((8, 8))
-                        for h in range(8):
-                            for v in range(8):
-                                h_idx = horiz_start_offset + h // 2
-                                v_idx = vert_start_offset + v // 2
-                                mat[h, v] = orig[h_idx, v_idx]
-                        return mat
+                horiz_start_offset = (8 // num_unsmeared_horiz) * horiz_idx
+                vert_start_offset = (8 // num_unsmeared_verti) * vert_idx
 
-                    cb_unsmeared = fill_up_unsmeared(cb_mcus[0], horiz_start_offset, vert_start_offset)
-                    unsmeared.color_components[1] = cb_unsmeared
+                cb_unsmeared = fill_up_unsmeared(decoded_mcu.mcus_after_idct[2][0], horiz_start_offset,
+                                                 vert_start_offset)
+                cr_unsmeared = fill_up_unsmeared(decoded_mcu.mcus_after_idct[3][0], horiz_start_offset,
+                                                 vert_start_offset)
 
-                    cr_unsmeared = fill_up_unsmeared(cr_mcus[0], horiz_start_offset, vert_start_offset)
-                    unsmeared.color_components[2] = cr_unsmeared
-
-                    horiz_unsmeared_idx = (decoded_mcu_idx % num_unsmeared_horiz) * (pixels_mcu_horiz // 8) + horiz_idx
-                    verti_unsmeared_idx = (decoded_mcu_idx // num_unsmeared_horiz) * (pixels_mcu_verti // 8) + vert_idx
-                    self._unsmeared_mcu_matrix[horiz_unsmeared_idx, verti_unsmeared_idx] = unsmeared
+                horiz_unsmeared_idx = (decoded_mcu_idx % num_unsmeared_horiz) * (pixels_mcu_horiz // 8) + horiz_idx
+                verti_unsmeared_idx = (decoded_mcu_idx // num_unsmeared_horiz) * (pixels_mcu_verti // 8) + vert_idx
+                unsmeared = UnsmearedMcu({0: y_mcu, 1: cb_unsmeared, 2: cr_unsmeared})
+                self._unsmeared_mcu_matrix[horiz_unsmeared_idx, verti_unsmeared_idx] = unsmeared
 
             decoded_mcu_idx += 1
 
@@ -243,20 +240,18 @@ class RawDataDecoder:
 
     def _to_rgb(self):
         def get_rgb_from_ycbcr(y, cb, cr):
-            r = cr * (2-2*self.Cred) + y
-            b = cb * ( 2 - 2* self.Cblue) + y
+            r = cr * (2 - 2 * self.Cred) + y
+            b = cb * (2 - 2 * self.Cblue) + y
             g = (y - self.Cblue * b - self.Cred * r) / self.Cgreen
-            return r,g,b
+            return r, g, b
 
-        for (i,j), y_cb_cr_mat in self._unsmeared_mcu_matrix.items():
-            self._rgb_matrix[i,j] = {i : np.zeros((8,8)) for i in range(3)}
-            for row in range(8):
-                for col in range(8):
-                    new_colors = get_rgb_from_ycbcr(*[y_cb_cr_mat.color_components[i][row, col] for i in range(3)])
+        for (i, j), y_cb_cr_mat in self._unsmeared_mcu_matrix.items():
+            self._rgb_matrix[i, j] = {i: np.zeros((8, 8)) for i in range(3)}
+            for row, col in itertools.product(range(8), range(8)):
+                new_colors = get_rgb_from_ycbcr(*[y_cb_cr_mat.color_components[i][row, col] for i in range(3)])
+                assert(all([0 <= new_colors[color_component] + 128 <= 255 for color_component in range(3)]))
 
-
-                    for p in range(3):
-                        self._rgb_matrix[i,j][p][row,col] = new_colors[p] + 128
-                        assert(0 <= new_colors[p] + 128 <= 255)
+                for color_component in range(3):
+                    self._rgb_matrix[i, j][color_component][row, col] = new_colors[color_component] + 128
 
         debug_print("Done YCbCr -> RGB transformation")
