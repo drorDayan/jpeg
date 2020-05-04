@@ -41,3 +41,7 @@ class JpegBitReader:
                         self._last_byte_is_FF = False
 
         return bits_to_return
+
+    def read_bits_as_int(self, num_bits):
+        res_bits = self.get_bits_as_bool_list(num_bits)
+        return sum([2**i for i in range(len(res_bits)) if res_bits[i]])

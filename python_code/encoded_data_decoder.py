@@ -20,26 +20,17 @@ def zig_zag_index(k, n=8):
     return (j, i - j) if i & 1 else (i - j, j)
 
 
-def dc_value_encoding(dc_code: int, additional_bits: int):
+# This is table 5 from https://www.impulseadventure.com/photo/jpeg-huffman-coding.html. It is used for value encoding.
+# It is const and does not appear anywhere in the JPG file.
+def value_encoding(dc_code: int, additional_bits: int):
     if dc_code == 0:
         return 0
     dc_value_sign = 1 if ((additional_bits & (1 << (dc_code - 1))) > 0) else -1
     additional_bits_to_add = additional_bits & ((1 << (dc_code - 1)) - 1)
 
-    if dc_value_sign:
-        dc_value_base = 2 ** (dc_code - 1)
-    else:
-        dc_value_base = -1 * (2 ** dc_code - 1)
+    dc_value_base = (2 ** (dc_code - 1)) if dc_value_sign else (-1 * (2 ** dc_code - 1))
 
     return dc_value_sign * (dc_value_base + additional_bits_to_add)
-
-
-def read_bits(num_bits, bit_reader):
-    val = 0
-    for i in range(num_bits):
-        next_bit = bit_reader.get_bits_as_bool_list(1)[0]
-        val = val * 2 + (1 if next_bit else 0)
-    return val
 
 
 def put_value_in_matrix_zigzag(matrix, value, index):
@@ -115,6 +106,14 @@ class RawDataDecoder:
                     debug_print(after_idct)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
 
+    # The jpeg MCUs are simply placed one after the other, therefore decoding them must be in order.
+    # Here, each decoding step is done for every MCU, one by one.
+    # To decode an MCU one must do the following:
+    #   1. Decode the huffman.
+    #   2. Convert the bits to dc and ac values (will be further explained by Gal later)
+    #   3. Un quantize
+    #   4. Un DCT
+    #   5. Convert to rgb
     def decode(self):
 
         bit_reader = JpegBitReader(self.raw_data)
@@ -161,9 +160,9 @@ class RawDataDecoder:
         dc_code = self.decode_with_huffman(bit_reader, dc_tree)
         debug_print('DC code is ', hex(dc_code))
         assert (dc_code <= 0x0F)
-        additional_bits = read_bits(dc_code, bit_reader)
+        additional_bits = bit_reader.read_bits_as_int(dc_code)
 
-        dc_value = dc_value_encoding(dc_code, additional_bits)
+        dc_value = value_encoding(dc_code, additional_bits)
 
         decoded_idx = 0
 
@@ -194,10 +193,10 @@ class RawDataDecoder:
                 for i in range(run_length):
                     put_value_in_matrix_zigzag(decoded_mcu, 0, decoded_idx)
                     decoded_idx += 1
-                value_aux = read_bits(size, bit_reader)
+                value_aux = bit_reader.read_bits_as_int(size)
                 debug_print(f"additional bits = {value_aux}")
 
-                ac_value = dc_value_encoding(size, value_aux)  # This is again table 5!!
+                ac_value = value_encoding(size, value_aux)  # This is again table 5!!
                 debug_print(f"AC value = {ac_value}")
                 put_value_in_matrix_zigzag(decoded_mcu, ac_value, decoded_idx)
                 decoded_idx += 1
