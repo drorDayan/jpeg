@@ -22,24 +22,11 @@ class Jpeg:
         self._component_id_to_sample_factors = {}
         self._exists_eoi = False
 
-        self._restart_interval = None
-        # TODO check whether the code works or not for min != 1
-        self._min_vertical_sample_factor = None
-        self._max_vertical_sample_factor = None
-        self._min_horizontal_sample_factor = None
-        self._max_horizontal_sample_factor = None
+        self.restart_interval = None
+        self.height = None
+        self.width = None
 
-        self._parsed_mcu_num_horizontal_pixels = None
-        self._parsed_mcu_num_vertical_pixels = None
-
-        self._num_mcus_horizontal = None
-        self._num_mcus_vertical = None
-
-        self._number_of_items_per_mcu = 0
-        self._height = None
-        self._width = None
-        self._mcu_list = []
-        self._components = {}
+        self.jpeg_decode_metadata = None
 
         jpeg_file = open(jpeg_file_path, 'rb')
         self._jpg_data = jpeg_file.read()
@@ -83,19 +70,15 @@ class Jpeg:
                 start_idx = idx_in_file + 4
                 is_continue = parser.parse(self, self._jpg_data[start_idx: start_idx + marker_size - 2])
             idx_in_file += (2 + marker_size)  # This is including the size and not including the 0xYY marker (so 4-2=2).
-        self.finalize_metadata()  # TODO Create POJO of JPG metadata
+        self.finalize_metadata()
         debug_print("Finished finalizing metadata!")
 
         self.decode_raw_data(idx_in_file)
         debug_print("Parsing completed!")
 
-    def set_restart_interval(self, rst_interval):  # TODO change this to a public member. Also in height & width
-        self._restart_interval = rst_interval
-
     def decode_raw_data(self, start_idx):
-        decoder = RawDataDecoder()  # TODO send jpg in ctor
-        decoder.decode(self._jpg_data[start_idx:], self._components, self._num_mcus_horizontal, self._num_mcus_vertical,
-                       self._parsed_mcu_num_horizontal_pixels, self._parsed_mcu_num_vertical_pixels)
+        decoder = RawDataDecoder(self._jpg_data[start_idx:], self.jpeg_decode_metadata)
+        decoder.decode()
         '''return the idx where data ended. it should be aligned to a byte as of the ignore bytes'''
 
     def add_huffman_table(self, huff_table):
@@ -112,10 +95,6 @@ class Jpeg:
             raise Exception("error quantization table with this id exists")
         self._quantization_tables[table_id] = quantization_table_to_add
         return True
-
-    def set_height_and_width(self, height, width):
-        self._height = height
-        self._width = width
 
     def add_component_quantization_table(self, component_id, quantization_table_id):
         if component_id in self._component_id_to_quantization_table_id:
@@ -143,47 +122,54 @@ class Jpeg:
         vertical_sample_factor: int
         number_of_instances_in_mcu: int
 
+    @dataclass
+    class JpegDecodeMetadata:
+        restart_interval: int
+        horiz_pixels_in_mcu: int
+        vert_pixels_in_mcu: int
+        height: int
+        width: int
+        components_to_metadata: {}
+
     '''This function collects all data related to specific components into one CONVENIENT data structure
     we need to do this because the metadata of each component is the indexes of tables
     and the tables might be defined afterwards'''
 
     def finalize_metadata(self):
+        components_to_metadata = {}
         for comp_id in self._component_id_to_quantization_table_id.keys():
             ac_t = self._ac_huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][0]]
             dc_t = self._dc_huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][1]]
             q_t = self._quantization_tables[self._component_id_to_quantization_table_id[comp_id]]
             horizontal_sample_factor, vertical_sample_factor = self._component_id_to_sample_factors[comp_id]
-            self._components[comp_id] = Jpeg.ComponentMetadata(
+            components_to_metadata[comp_id] = Jpeg.ComponentMetadata(
                 ac_t, dc_t, q_t, horizontal_sample_factor, vertical_sample_factor, 0)
 
-        self._min_vertical_sample_factor = min([comp.vertical_sample_factor for comp in self._components.values()])
-        self._max_vertical_sample_factor = max([comp.vertical_sample_factor for comp in self._components.values()])
-        self._min_horizontal_sample_factor = min([comp.horizontal_sample_factor for comp in self._components.values()])
-        self._max_horizontal_sample_factor = max([comp.horizontal_sample_factor for comp in self._components.values()])
+        min_vertical_sample_factor = min([comp.vertical_sample_factor for comp in components_to_metadata.values()])
+        max_vertical_sample_factor = max([comp.vertical_sample_factor for comp in components_to_metadata.values()])
+        min_horizontal_sample_factor = min([comp.horizontal_sample_factor for comp in components_to_metadata.values()])
+        max_horizontal_sample_factor = max([comp.horizontal_sample_factor for comp in components_to_metadata.values()])
 
-        for comp in self._components.values():
+        for comp in components_to_metadata.values():
             comp.number_of_instances_in_mcu = \
-                comp.horizontal_sample_factor // self._min_horizontal_sample_factor \
-                * comp.vertical_sample_factor // self._min_vertical_sample_factor
-            self._number_of_items_per_mcu += comp.number_of_instances_in_mcu
+                comp.horizontal_sample_factor // min_horizontal_sample_factor \
+                * comp.vertical_sample_factor // min_vertical_sample_factor
 
-        assert self._max_horizontal_sample_factor % self._min_horizontal_sample_factor == 0
-        assert self._max_vertical_sample_factor % self._min_vertical_sample_factor == 0
+        assert max_horizontal_sample_factor % min_horizontal_sample_factor == 0
+        assert max_vertical_sample_factor % min_vertical_sample_factor == 0
 
-        assert self._min_horizontal_sample_factor == 1 and self._min_vertical_sample_factor == 1, "Learn about min sampling factors...."
-        self._parsed_mcu_num_horizontal_pixels = 8 * self._max_horizontal_sample_factor // self._min_horizontal_sample_factor
-        self._parsed_mcu_num_vertical_pixels = 8 * self._max_vertical_sample_factor // self._min_vertical_sample_factor
-
-        debug_print(
-            f"Parsed MCU size: {self._parsed_mcu_num_horizontal_pixels} over {self._parsed_mcu_num_vertical_pixels} pixels")
-
-        self._num_mcus_horizontal = math.ceil(float(self._width) / self._parsed_mcu_num_horizontal_pixels)
-        self._num_mcus_vertical = math.ceil(float(self._height) / self._parsed_mcu_num_vertical_pixels)
+        assert min_horizontal_sample_factor == 1 and min_vertical_sample_factor == 1,\
+            "Learn about min sampling factors...."
+        horiz_pixels_in_mcu = 8 * max_horizontal_sample_factor // min_horizontal_sample_factor
+        vert_pixels_in_mcu = 8 * max_vertical_sample_factor // min_vertical_sample_factor
 
         debug_print(
-            f"Image is {self._height}*{self._width}, and so we will encounter {self._num_mcus_vertical}*{self._num_mcus_horizontal} MCUs")
+            f"Parsed MCU size: {horiz_pixels_in_mcu} over {vert_pixels_in_mcu} pixels")
 
-        for comp in self._components.items(): #TODO do it better
-            debug_print("comp num ", comp[0], "has the following data", comp[1])
+        self.jpeg_decode_metadata = Jpeg.JpegDecodeMetadata(self.restart_interval, horiz_pixels_in_mcu,
+                                                            vert_pixels_in_mcu, self.height,
+                                                            self.width, components_to_metadata)
 
-#TODO seperate debug_print from info_print
+        # for comp in components_to_metadata.items(): #TODO do it better
+        #     debug_print("comp num ", comp[0], "has the following data", comp[1])
+

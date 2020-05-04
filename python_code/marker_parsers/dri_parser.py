@@ -8,6 +8,6 @@ class DriParser(IParser):
         if len(raw_marker) != 2:
             raise Exception("Invalid size of DRI marker")
         rst_interval = int.from_bytes(raw_marker[0: 2], byteorder='big')
-        jpg.set_restart_interval(rst_interval)
+        jpg.restart_interval = rst_interval
         debug_print("DRI parser ended successfully")
         return True

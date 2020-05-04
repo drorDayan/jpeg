@@ -1,4 +1,5 @@
 import itertools
+import math
 
 import numpy as np
 import scipy as scipy
@@ -63,7 +64,9 @@ class UnsmearedMcu:
 
 
 class RawDataDecoder:
-    def __init__(self):
+    def __init__(self, raw_data, jpeg_decode_metadata):
+        self.raw_data = raw_data
+        self.jpeg_decode_metadata = jpeg_decode_metadata
         self._decoded_mcu_list = []
         self._unsmeared_mcu_matrix = {}  # will be (i,j) -> triplet of 8*8 numpy matrix of ycbcr
         self._rgb_matrix = {}  # will be (i,j) ->triplet 8*8 numpy matrix of rgbs
@@ -103,28 +106,35 @@ class RawDataDecoder:
                     debug_print(de_quantized_mcu)
                     decoded_mcu.dequantized_mcus[comp_id].append(de_quantized_mcu)
 
-    def do_idct(self, components):
+    def do_idct(self, component_keys):
         for decoded_mcu in self._decoded_mcu_list:
-            for (comp_id, comp) in components.items():
+            for comp_id in component_keys:
                 for comp_mcu in decoded_mcu.raw_mcus[comp_id]:
                     after_idct = scipy.fft.idct(comp_mcu)
                     debug_print("After IDCT:")
                     debug_print(after_idct)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
 
-    def decode(self, raw_data, components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_verti):
+    def decode(self):
 
-        bit_reader = JpegBitReader(raw_data)
-        self.read_raw_mcus(bit_reader, components, n_mcu_horiz, n_mcu_vert)
+        bit_reader = JpegBitReader(self.raw_data)
+        pixels_mcu_horiz = self.jpeg_decode_metadata.horiz_pixels_in_mcu
+        pixels_mcu_vert = self.jpeg_decode_metadata.vert_pixels_in_mcu
+
+        n_mcu_horiz = math.ceil(self.jpeg_decode_metadata.width / pixels_mcu_horiz)
+        n_mcu_vert = math.ceil(self.jpeg_decode_metadata.height / pixels_mcu_vert)
+
+        self.read_raw_mcus(bit_reader, self.jpeg_decode_metadata.components_to_metadata, n_mcu_horiz, n_mcu_vert)
         self.absoultify_dc_values()
-        self.de_quantize(components)
-        self.do_idct(components)
-        self.unsmear_mcus(components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_verti)
+        self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
+        self.do_idct(self.jpeg_decode_metadata.components_to_metadata.keys())
+        self.unsmear_mcus(self.jpeg_decode_metadata.components_to_metadata, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz,
+                          pixels_mcu_vert)
         self._to_rgb()
 
         bmp_writer = BmpWriter()
         bmp_writer.write_from_rgb(self._rgb_matrix, width=n_mcu_horiz * pixels_mcu_horiz,
-                                  height=n_mcu_vert * pixels_mcu_verti)
+                                  height=n_mcu_vert * pixels_mcu_vert)
 
         '''
         
@@ -200,10 +210,9 @@ class RawDataDecoder:
     def absoultify_dc_values(self):
         print("Yo what about me?")
 
-    def unsmear_mcus(self, components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_verti):
-        decoded_mcu_idx = 0
+    def unsmear_mcus(self, components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert):
         num_unsmeared_horiz = pixels_mcu_horiz // 8
-        num_unsmeared_verti = pixels_mcu_verti // 8
+        num_unsmeared_verti = pixels_mcu_vert // 8
         assert (1 <= num_unsmeared_horiz <= 2 and 1 <= num_unsmeared_verti <= 2)
 
         for decoded_mcu_idx in range(len(self._decoded_mcu_list)):
@@ -230,7 +239,7 @@ class RawDataDecoder:
                                                  vert_start_offset)
 
                 horiz_unsmeared_idx = (decoded_mcu_idx % num_unsmeared_horiz) * (pixels_mcu_horiz // 8) + horiz_idx
-                verti_unsmeared_idx = (decoded_mcu_idx // num_unsmeared_horiz) * (pixels_mcu_verti // 8) + vert_idx
+                verti_unsmeared_idx = (decoded_mcu_idx // num_unsmeared_horiz) * (pixels_mcu_vert // 8) + vert_idx
                 unsmeared = UnsmearedMcu({0: y_mcu, 1: cb_unsmeared, 2: cr_unsmeared})
                 self._unsmeared_mcu_matrix[horiz_unsmeared_idx, verti_unsmeared_idx] = unsmeared
 
