@@ -8,7 +8,7 @@ class SosParser(IParser):
         if raw_marker[0] < 1 or raw_marker[0] > 4:
             raise Exception("Illegal number of components in SOS")
         num_components = raw_marker[0]
-        assert num_components == 3, "Num components must be 3"
+        assert num_components == number_of_components, f"Num components must be {number_of_components}"
 
         idx = 1
         for comp_id in range(num_components):

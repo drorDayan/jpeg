@@ -22,7 +22,7 @@ class Sof0Parser(IParser):
             raise Exception("illegal height and width")
 
         num_of_comp = raw_marker[Sof0Parser.num_of_comp_idx]
-        assert num_of_comp == 3, "for now only 3 components are supported"
+        assert num_of_comp == number_of_components, f"for now only {number_of_components} components are supported"
 
         for i in range(num_of_comp):
             comp_id = raw_marker[Sof0Parser.component_data_idx + i*Sof0Parser.single_component_data_len]

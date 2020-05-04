@@ -21,7 +21,7 @@ class BmpWriter:
         self._reserved = 0
         self._pixel_data_offset = 40 + 14
 
-    # input is dict {i,j -> {color_comp -> np.matrix(8,8), color_comp in range(3)]}
+    # input is dict {i,j -> {color_comp -> np.matrix(8,8), color_comp in range(number_of_components)]}
     def write_from_rgb(self, rgb_mat, width, height, path_to_write='bmp_from_jpg.bmp'):
         bytes_to_write = self.get_bytes_to_write(rgb_mat, width, height)
 

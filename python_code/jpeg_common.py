@@ -1,4 +1,5 @@
 level = "debug"
+number_of_components = 3
 
 
 def debug_print(*arg, newline=True):

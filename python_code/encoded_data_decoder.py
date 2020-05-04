@@ -6,7 +6,7 @@ import scipy as scipy
 
 from bmp_writer import BmpWriter
 from jpeg_bit_reader import JpegBitReader
-from jpeg_common import debug_print
+from jpeg_common import debug_print, number_of_components
 
 
 def zig_zag_index(k, n=8):
@@ -66,19 +66,37 @@ class RawDataDecoder:
         self.Cgreen = 0.587
         self.Cblue = 0.114
 
-    def read_raw_mcus(self, bit_reader, components, n_mcu_horiz, n_mcu_vert):
+    def read_raw_mcus(self, bit_reader, components, n_mcu_horiz, n_mcu_vert, restart_interval):
         idx = 0
+        rst_idx = 0
+        prev_dc_value = 0
         while idx < n_mcu_horiz * n_mcu_vert:
-            if idx > 0:
-                break
-            debug_print(f"Decoding MCU #{idx}")
-            parsed_mcu = McuParsedDctComponents()
+            # if idx > 0:
+            #     break
 
-            for (comp_id, comp) in components.items():
-                for comp_no in range(comp.number_of_instances_in_mcu):
-                    decoded_mcu = self.decode_component_mcu(bit_reader, comp.ac_huffman_table, comp.dc_huffman_table)
-                    parsed_mcu.add_mcu(comp_id, decoded_mcu)
-            self._decoded_mcu_list.append(parsed_mcu)
+            if restart_interval is not None and idx > 0 and (idx % restart_interval == 0):
+                # We expect RSTm
+                bit_reader.align()
+                marker_mark = bit_reader.read_bits_as_int(8)
+                if marker_mark != 0xFF:
+                    raise Exception("Expected RST marker during data scan, no marker appears")
+                marker_type = bit_reader.read_bits_as_int(8)
+                if marker_type != 0xd0 + rst_idx:
+                    if marker_type & 0xf0 == 0xd0:
+                        raise Exception(f"Expected RST marker is wrong. Expected {rst_idx} and got {marker_type & 0x0F}")
+                    else:
+                        raise Exception(f"Expected RST marker and got different marker of type {marker_type}")
+                prev_dc_value = 0
+                rst_idx = rst_idx + 1 if rst_idx < 7 else 0
+            else:
+                debug_print(f"Decoding MCU #{idx}")
+                parsed_mcu = McuParsedDctComponents()
+
+                for (comp_id, comp) in components.items():
+                    for comp_no in range(comp.number_of_instances_in_mcu):
+                        decoded_mcu = self.decode_component_mcu(bit_reader, comp.ac_huffman_table, comp.dc_huffman_table)
+                        parsed_mcu.add_mcu(comp_id, decoded_mcu)
+                self._decoded_mcu_list.append(parsed_mcu)
 
             idx += 1
 
@@ -123,7 +141,7 @@ class RawDataDecoder:
         n_mcu_horiz = math.ceil(self.jpeg_decode_metadata.width / pixels_mcu_horiz)
         n_mcu_vert = math.ceil(self.jpeg_decode_metadata.height / pixels_mcu_vert)
 
-        self.read_raw_mcus(bit_reader, self.jpeg_decode_metadata.components_to_metadata, n_mcu_horiz, n_mcu_vert)
+        self.read_raw_mcus(bit_reader, self.jpeg_decode_metadata.components_to_metadata, n_mcu_horiz, n_mcu_vert, self.jpeg_decode_metadata.restart_interval)
         self.absoultify_dc_values()
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
         self.do_idct(self.jpeg_decode_metadata.components_to_metadata.keys())
@@ -252,12 +270,12 @@ class RawDataDecoder:
             return r, g, b
 
         for (i, j), y_cb_cr_mat in self._unsmeared_mcu_matrix.items():
-            self._rgb_matrix[i, j] = {i: np.zeros((8, 8)) for i in range(3)}
+            self._rgb_matrix[i, j] = {i: np.zeros((8, 8)) for i in range(number_of_components)}
             for row, col in itertools.product(range(8), range(8)):
-                new_colors = get_rgb_from_ycbcr(*[y_cb_cr_mat.color_components[i][row, col] for i in range(3)])
-                assert (all([0 <= new_colors[color_component] + 128 <= 255 for color_component in range(3)]))
+                new_colors = get_rgb_from_ycbcr(*[y_cb_cr_mat.color_components[i][row, col] for i in range(number_of_components)])
+                assert (all([0 <= new_colors[color_component] + 128 <= 255 for color_component in range(number_of_components)]))
 
-                for color_component in range(3):
+                for color_component in range(number_of_components):
                     self._rgb_matrix[i, j][color_component][row, col] = new_colors[color_component] + 128
 
         debug_print("Done YCbCr -> RGB transformation")

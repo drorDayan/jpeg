@@ -36,7 +36,7 @@ class JpegBitReader:
                             print("FF00 Happened!")
                             self._byte_idx += 1
                         else:
-                            print(f"BAD MARKER: FF{hex(self._bytes[self._byte_idx])} ")
+                            print(f"BAD MARKER: FF{hex(self._bytes[self._byte_idx])} ") #TODO this is not a bad marker upupu
                            # raise Exception("IEEE MARKER HERE")
                         self._last_byte_is_FF = False
 
@@ -44,4 +44,11 @@ class JpegBitReader:
 
     def read_bits_as_int(self, num_bits):
         res_bits = self.get_bits_as_bool_list(num_bits)
-        return sum([2**i for i in range(len(res_bits)) if res_bits[i]])
+        return sum([2**(len(res_bits) - 1 - i) for i in range(len(res_bits)) if res_bits[i]])
+
+    def align(self):
+        if self._bit_idx == 0:
+            return
+        res = self.get_bits_as_bool_list(8-self._bit_idx)
+        if not all(res):
+            raise Exception("Alignment before marker is wrong.")
