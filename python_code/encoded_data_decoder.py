@@ -49,7 +49,7 @@ def put_value_in_matrix_zigzag(matrix, value, index):
 
 class McuParsedDctComponents:
     def __init__(self):
-        self.raw_mcus = {i: [] for i in range(1, 4)}
+        self.raw_mcus = {i: [] for i in range(1, 4)}  # TODO fix indices
         self.dequantized_mcus = {i: [] for i in range(1, 4)}
         self.mcus_after_idct = {i: [] for i in range(1, 4)}
 
@@ -127,12 +127,12 @@ class RawDataDecoder:
                                   height=n_mcu_vert * pixels_mcu_verti)
 
         '''
+        
         TODO:
         * merge unsmeared mcu to a single matrix per color component
         * finish bmp scanning with bigbig matrix
-        
-        '''
         # don't forget to absolutify dc values
+        '''
 
     @staticmethod
     def decode_with_huffman(bit_reader, huff_tree):
@@ -187,14 +187,14 @@ class RawDataDecoder:
                 value_aux = read_bits(size, bit_reader)
                 debug_print(f"additional bits = {value_aux}")
 
-                ac_value = dc_value_encoding(size, value_aux)
+                ac_value = dc_value_encoding(size, value_aux)  # This is again table 5!!
                 debug_print(f"AC value = {ac_value}")
                 put_value_in_matrix_zigzag(decoded_mcu, ac_value, decoded_idx)
                 decoded_idx += 1
 
         debug_print('Done decoding MCU')
 
-        print(decoded_mcu)
+        debug_print(decoded_mcu)
         return decoded_mcu
 
     def absoultify_dc_values(self):
@@ -206,7 +206,7 @@ class RawDataDecoder:
         num_unsmeared_verti = pixels_mcu_verti // 8
         assert (1 <= num_unsmeared_horiz <= 2 and 1 <= num_unsmeared_verti <= 2)
 
-        while decoded_mcu_idx < len(self._decoded_mcu_list):
+        for decoded_mcu_idx in range(len(self._decoded_mcu_list)):
 
             decoded_mcu = self._decoded_mcu_list[decoded_mcu_idx]
             assert all(len(decoded_mcu.mcus_after_idct[i]) == 1 for i in range(2, 4))
@@ -234,8 +234,6 @@ class RawDataDecoder:
                 unsmeared = UnsmearedMcu({0: y_mcu, 1: cb_unsmeared, 2: cr_unsmeared})
                 self._unsmeared_mcu_matrix[horiz_unsmeared_idx, verti_unsmeared_idx] = unsmeared
 
-            decoded_mcu_idx += 1
-
         debug_print("Done unsmearing")
 
     def _to_rgb(self):
@@ -249,7 +247,7 @@ class RawDataDecoder:
             self._rgb_matrix[i, j] = {i: np.zeros((8, 8)) for i in range(3)}
             for row, col in itertools.product(range(8), range(8)):
                 new_colors = get_rgb_from_ycbcr(*[y_cb_cr_mat.color_components[i][row, col] for i in range(3)])
-                assert(all([0 <= new_colors[color_component] + 128 <= 255 for color_component in range(3)]))
+                assert (all([0 <= new_colors[color_component] + 128 <= 255 for color_component in range(3)]))
 
                 for color_component in range(3):
                     self._rgb_matrix[i, j][color_component][row, col] = new_colors[color_component] + 128

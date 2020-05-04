@@ -1,6 +1,7 @@
 import math
 
 from encoded_data_decoder import RawDataDecoder
+from marker_parsers.dri_parser import DriParser
 from marker_parsers.sof0_parser import Sof0Parser
 from marker_parsers.dht_parser import DhtParser, HuffTable
 from marker_parsers.dqt_parser import DqtParser
@@ -21,6 +22,7 @@ class Jpeg:
         self._component_id_to_sample_factors = {}
         self._exists_eoi = False
 
+        self._restart_interval = None
         # TODO check whether the code works or not for min != 1
         self._min_vertical_sample_factor = None
         self._max_vertical_sample_factor = None
@@ -49,7 +51,8 @@ class Jpeg:
                 0xda: SosParser,
                 0xdb: DqtParser,
                 0xc0: Sof0Parser,
-                0xd9: EoiParser
+                0xd9: EoiParser,
+                0xdd: DriParser
             }
 
         '''
@@ -57,7 +60,7 @@ class Jpeg:
         DRI
         APPn, n>=1
         '''
-        self._markers_to_skip = {i for i in range(0xe1, 0xef + 1)} | {0xdd} | {0xe0}
+        self._markers_to_skip = {i for i in range(0xe1, 0xef + 1)} | {0xe0}
 
     def parse(self):
         debug_print("Started parsing!")
@@ -70,10 +73,8 @@ class Jpeg:
         while idx_in_file < len(self._jpg_data) and is_continue:
             marker = self._jpg_data[idx_in_file:idx_in_file + 2]
             marker_size = int.from_bytes(self._jpg_data[idx_in_file + 2: idx_in_file + 4], byteorder='big')
-            # debug_print(f"idx={idx_in_file}")
-            # debug_print(f"Marker size: {marker_size}")
-
             marker_type = marker[1]
+
             if marker_type not in self._markers_to_skip:
                 if marker_type not in self._marker_parsers.keys():
                     raise Exception(f"no marker of type {hex(marker_type)} implemented!")
@@ -82,13 +83,19 @@ class Jpeg:
                 start_idx = idx_in_file + 4
                 is_continue = parser.parse(self, self._jpg_data[start_idx: start_idx + marker_size - 2])
             idx_in_file += (2 + marker_size)  # This is including the size and not including the 0xYY marker (so 4-2=2).
-        self.finalize_metadata()
+        self.finalize_metadata()  # TODO Create POJO of JPG metadata
+        debug_print("Finished finalizing metadata!")
+
         self.decode_raw_data(idx_in_file)
         debug_print("Parsing completed!")
 
+    def set_restart_interval(self, rst_interval):  # TODO change this to a public member. Also in height & width
+        self._restart_interval = rst_interval
+
     def decode_raw_data(self, start_idx):
-        decoder = RawDataDecoder()
-        decoder.decode(self._jpg_data[start_idx:], self._components, self._num_mcus_horizontal, self._num_mcus_vertical, self._parsed_mcu_num_horizontal_pixels, self._parsed_mcu_num_vertical_pixels)
+        decoder = RawDataDecoder()  # TODO send jpg in ctor
+        decoder.decode(self._jpg_data[start_idx:], self._components, self._num_mcus_horizontal, self._num_mcus_vertical,
+                       self._parsed_mcu_num_horizontal_pixels, self._parsed_mcu_num_vertical_pixels)
         '''return the idx where data ended. it should be aligned to a byte as of the ignore bytes'''
 
     def add_huffman_table(self, huff_table):
@@ -139,6 +146,7 @@ class Jpeg:
     '''This function collects all data related to specific components into one CONVENIENT data structure
     we need to do this because the metadata of each component is the indexes of tables
     and the tables might be defined afterwards'''
+
     def finalize_metadata(self):
         for comp_id in self._component_id_to_quantization_table_id.keys():
             ac_t = self._ac_huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][0]]
@@ -155,23 +163,27 @@ class Jpeg:
 
         for comp in self._components.values():
             comp.number_of_instances_in_mcu = \
-                comp.horizontal_sample_factor//self._min_horizontal_sample_factor \
-                * comp.vertical_sample_factor//self._min_vertical_sample_factor
+                comp.horizontal_sample_factor // self._min_horizontal_sample_factor \
+                * comp.vertical_sample_factor // self._min_vertical_sample_factor
             self._number_of_items_per_mcu += comp.number_of_instances_in_mcu
 
-        assert(self._max_horizontal_sample_factor % self._min_horizontal_sample_factor == 0)
-        assert(self._max_vertical_sample_factor % self._min_vertical_sample_factor == 0)
+        assert self._max_horizontal_sample_factor % self._min_horizontal_sample_factor == 0
+        assert self._max_vertical_sample_factor % self._min_vertical_sample_factor == 0
 
-        self._parsed_mcu_num_horizontal_pixels = 8 * self._max_horizontal_sample_factor//self._min_horizontal_sample_factor
-        self._parsed_mcu_num_vertical_pixels = 8 * self._max_vertical_sample_factor//self._min_vertical_sample_factor
+        assert self._min_horizontal_sample_factor == 1 and self._min_vertical_sample_factor == 1, "Learn about min sampling factors...."
+        self._parsed_mcu_num_horizontal_pixels = 8 * self._max_horizontal_sample_factor // self._min_horizontal_sample_factor
+        self._parsed_mcu_num_vertical_pixels = 8 * self._max_vertical_sample_factor // self._min_vertical_sample_factor
 
-        debug_print(f"Parsed MCU size: {self._parsed_mcu_num_horizontal_pixels} over {self._parsed_mcu_num_vertical_pixels} pixels")
+        debug_print(
+            f"Parsed MCU size: {self._parsed_mcu_num_horizontal_pixels} over {self._parsed_mcu_num_vertical_pixels} pixels")
 
         self._num_mcus_horizontal = math.ceil(float(self._width) / self._parsed_mcu_num_horizontal_pixels)
         self._num_mcus_vertical = math.ceil(float(self._height) / self._parsed_mcu_num_vertical_pixels)
 
-        debug_print(f"Image is {self._height}*{self._width}, and so we will encounter {self._num_mcus_vertical}*{self._num_mcus_horizontal} MCUs")
+        debug_print(
+            f"Image is {self._height}*{self._width}, and so we will encounter {self._num_mcus_vertical}*{self._num_mcus_horizontal} MCUs")
 
-        for comp in self._components.items():
+        for comp in self._components.items(): #TODO do it better
             debug_print("comp num ", comp[0], "has the following data", comp[1])
 
+#TODO seperate debug_print from info_print

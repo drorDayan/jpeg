@@ -1,4 +1,3 @@
-
 use_debug_print = True
 
 
@@ -7,4 +6,4 @@ def debug_print(*arg, newline=True):
         if newline:
             print(*arg)
         if not newline:
-            print(*arg, end= " ")
+            print(*arg, end=" ")

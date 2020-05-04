@@ -1,6 +1,6 @@
 class BmpWriter:
     def __init__(self):
-        self._endianess ='little'
+        self._endianess = 'little'
 
         '''
         BMP_INFO_HEADER
@@ -9,9 +9,9 @@ class BmpWriter:
         self._num_planes = 1
         self._bits_per_pixel = 24
         self._compression = 0
-        self._image_size = 0 #OK as compression = 0
+        self._image_size = 0  # OK as compression = 0
         self._pixels_per_meters_x = self._pixels_per_meters_y = 0
-        self._num_colors = 0 # 2 ** bits per pixel is used
+        self._num_colors = 0  # 2 ** bits per pixel is used
         self._num_important_colors = 0
 
         '''
@@ -19,7 +19,8 @@ class BmpWriter:
         '''
         self._file_size = 0
         self._reserved = 0
-        self._pixel_data_offset = 40+14
+        self._pixel_data_offset = 40 + 14
+
     # input is dict {i,j -> {color_comp -> np.matrix(8,8), color_comp in range(3)]}
     def write_from_rgb(self, rgb_mat, width, height, path_to_write='bmp_from_jpg.bmp'):
         bytes_to_write = self.get_bytes_to_write(rgb_mat, width, height)
@@ -29,12 +30,11 @@ class BmpWriter:
 
         print('BMP generated!')
 
-
     def get_bytes_to_write(self, rgb_mat, width, height):
         to_write = bytearray(b"")
         bitmap_header = self._generate_bitmap_header()
         bitmap_info_header = self.generate_bitmap_info_header(rgb_mat, width, height)
-        color_palatte = bytearray(b"") # No color palatte as we use 24bits for each pixel
+        color_palatte = bytearray(b"")  # No color palatte as we use 24bits for each pixel
         actual_image_data = self._generate_image_data(rgb_mat, width, height)
 
         to_write += bitmap_header
@@ -74,5 +74,3 @@ class BmpWriter:
 
     def _generate_image_data(self, rgb_mat, width, height):
         return bytearray()
-
-
