@@ -29,15 +29,17 @@ def value_encoding(dc_code: int, additional_bits: int):
     dc_value_sign = 1 if ((additional_bits & (1 << (dc_code - 1))) > 0) else -1
     additional_bits_to_add = additional_bits & ((1 << (dc_code - 1)) - 1)
 
-    dc_value_base = (2 ** (dc_code - 1)) if dc_value_sign else (-1 * (2 ** dc_code - 1))
+    dc_value_base = (2 ** (dc_code - 1)) if dc_value_sign > 0 else (-1 * ((2 ** dc_code) - 1))
 
-    return dc_value_sign * (dc_value_base + additional_bits_to_add)
+    return dc_value_base + additional_bits_to_add
 
 
 def put_value_in_matrix_zigzag(matrix, value, index):
     row, col = zig_zag_index(index)
     matrix[row, col] = value
-    debug_print(f"MCU: putting {value} in ({row},{col})")
+
+
+#   debug_print(f"MCU: putting {value} in ({row},{col})")
 
 
 class McuParsedDctComponents:
@@ -61,15 +63,11 @@ class RawDataDecoder:
         self.raw_data = raw_data
         self.jpeg_decode_metadata = jpeg_decode_metadata
         self._decoded_mcu_list = []
-        
-        # DROR: change alg and remove:
 
-        self._full_image = np.zeros((self.jpeg_decode_metadata.height, self.jpeg_decode_metadata.width), dtype=(int, 3))
-
-        # DROR: we live in the YCbCr to RGB function
-        self.Cred = 0.299
-        self.Cgreen = 0.587
-        self.Cblue = 0.114
+        self._full_image_ycbcr = np.zeros((self.jpeg_decode_metadata.height, self.jpeg_decode_metadata.width),
+                                          dtype=(float, 3))
+        self._full_image_rgb = np.zeros((self.jpeg_decode_metadata.height, self.jpeg_decode_metadata.width),
+                                        dtype=(int, 3))
 
     @staticmethod
     def handle_restart_interval(bit_reader, rst_idx):
@@ -113,17 +111,23 @@ class RawDataDecoder:
                 quantization_table = comp.quantization_table
                 for comp_mcu in decoded_mcu.raw_mcus[comp_id]:
                     de_quantized_mcu = np.multiply(quantization_table, comp_mcu)
+                    if comp_id == 1:
+                        debug_print(de_quantized_mcu)
                     decoded_mcu.dequantized_mcus[comp_id].append(de_quantized_mcu)
         debug_print("Finish De-quantization")
 
     def inverse_dct(self, component_keys):
+        debug_print("Beginning IDCT")
         for decoded_mcu in self._decoded_mcu_list:
             for comp_id in component_keys:
                 for comp_mcu in decoded_mcu.dequantized_mcus[comp_id]:
-                    after_idct = scipy.fft.idct(scipy.fft.idct(comp_mcu.T).T)
+                    after_idct = scipy.fft.idct(scipy.fft.idct(comp_mcu.T).T)  # / (np.ones((8,8)) * 4)
+                    if comp_id == 1:
+                        debug_print(after_idct)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
+        debug_print("Finished IDCT")
 
-    #TODO
+    # TODO
     # Understand 2D-DCT : https://stackoverflow.com/questions/15978468/using-the-scipy-dct-function-to-create-a-2d-dct-ii
 
     # The jpeg MCUs are simply placed one after the other, therefore decoding them must be in order.
@@ -151,18 +155,19 @@ class RawDataDecoder:
 
         self._unsmear_mcus_into_full_image(n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert)
 
-        debug_print("Before RGB")
+        debug_print("YCbCr Matrices:")
 
-        debug_print(self._full_image)
+        print_mat_by_components(self._full_image_ycbcr)
 
         self._to_rgb()
+        debug_print("RGB Matrices:")
 
-        debug_print(self._full_image)
+        print_mat_by_components(self._full_image_rgb)
         bmp_writer = BmpWriter()
-        bmp_writer.write_from_rgb(self._full_image, width=n_mcu_horiz * pixels_mcu_horiz,
+        bmp_writer.write_from_rgb(self._full_image_rgb, width=n_mcu_horiz * pixels_mcu_horiz,
                                   height=n_mcu_vert * pixels_mcu_vert)
 
-        return bit_reader.get_byte_location(), self._full_image
+        return bit_reader.get_byte_location(), self._full_image_rgb
 
     @staticmethod
     def decode_with_huffman(bit_reader, huff_tree):
@@ -180,9 +185,9 @@ class RawDataDecoder:
     # Then you remember the DC value is relative to the previous one in the same component so you do the funny
     # offset calculation and Voilà! Your DC value is ready :)
     def decode_dc_for_component_in_mcu(self, dc_tree, bit_reader, prev_dc_value, comp_id):
-        debug_print('Decoding DC')
+        #   debug_print('Decoding DC')
         dc_code = self.decode_with_huffman(bit_reader, dc_tree)
-        debug_print('DC code is ', hex(dc_code))
+        #   debug_print('DC code is ', hex(dc_code))
         assert 0 <= dc_code <= 0x0F, "dc_code must be 0 to 16"
         additional_bits = bit_reader.read_bits_as_int(dc_code)
         dc_value = value_encoding(dc_code, additional_bits)
@@ -200,30 +205,30 @@ class RawDataDecoder:
     # Otherwise you put run_length zeros zigzagly and then you do again the table 5 SHTIK with size bits you read,
     # which are like additional_bits in the DC explanation. Thus fiasco gives you an AC value which is != 0.
     def decode_ac_for_component_in_mcu(self, ac_tree, bit_reader, decoded_component_data):
-        debug_print('Decoding AC')
+        #  debug_print('Decoding AC')
         decoded_idx = 1
         while decoded_idx < 64:
             ac_code = self.decode_with_huffman(bit_reader, ac_tree)
             run_length = (ac_code & 0xf0) >> 4
             size = ac_code & 0x0f
-            debug_print(f"AC code = {ac_code}, which is ({run_length}, {size})")
+            #  debug_print(f"AC code = {ac_code}, which is ({run_length}, {size})")
             if run_length == 0 and size == 0:
                 # This is EOB. No more (we start with a zero matrix)
-                debug_print("EOB")
+                #   debug_print("EOB")
                 break
             elif run_length == 15 and size == 0:
                 # This is ZRL
-                debug_print("ZRL")
+                #     debug_print("ZRL")
                 decoded_idx += 16
                 continue
             else:
-                debug_print(f"Putting {run_length} zero AC values")
+                #    debug_print(f"Putting {run_length} zero AC values")
                 decoded_idx += run_length
                 value_aux = bit_reader.read_bits_as_int(size)
-                debug_print(f"additional bits = {value_aux}")
+                #   debug_print(f"additional bits = {value_aux}")
 
                 ac_value = value_encoding(size, value_aux)  # This is again table 5!!
-                debug_print(f"AC value = {ac_value}")
+                #   debug_print(f"AC value = {ac_value}")
                 put_value_in_matrix_zigzag(decoded_component_data, ac_value, decoded_idx)
                 decoded_idx += 1
 
@@ -239,24 +244,21 @@ class RawDataDecoder:
         debug_print(decoded_component_data)
         return decoded_component_data
 
-
     def _to_rgb(self):
-        def get_rgb_from_ycbcr(y, cb, cr):
-            r = cr * (2 - 2 * self.Cred) + y
-            b = cb * (2 - 2 * self.Cblue) + y
-            g = (y - self.Cblue * b - self.Cred * r) / self.Cgreen
-            return r + 128, g + 128, b + 128
 
-        for (i, j) in itertools.product(range(self.jpeg_decode_metadata.height), range(self.jpeg_decode_metadata.width)):
-            self._full_image[i, j] = get_rgb_from_ycbcr(*self._full_image[i,j])
+        debug_print("Beginning YCbCr -> RGB transformation")
+        for (i, j) in itertools.product(range(self.jpeg_decode_metadata.height),
+                                        range(self.jpeg_decode_metadata.width)):
+            rgb_values = get_rgb_from_ycbcr(*self._full_image_ycbcr[i, j])
+            self._full_image_rgb[i, j] = rgb_values
 
-        debug_print("Done YCbCr -> RGB transformation")
+        debug_print("Finished YCbCr -> RGB transformation")
 
     def copy_to_full_image(self, start_horiz_idx_dst, start_vert_idx_dst, dst, comp):
-        assert dst.shape[0] + start_vert_idx_dst <= self._full_image.shape[0] and \
-               dst.shape[1] + start_horiz_idx_dst <= self._full_image.shape[1] and 0 <= comp <= 2
-        for i,j in itertools.product(range(8), range(8)):
-            self._full_image[start_vert_idx_dst+i, start_horiz_idx_dst+j, comp] = dst[i,j]
+        assert dst.shape[0] + start_vert_idx_dst <= self._full_image_ycbcr.shape[0] and \
+               dst.shape[1] + start_horiz_idx_dst <= self._full_image_ycbcr.shape[1] and 0 <= comp <= 2
+        for i, j in itertools.product(range(8), range(8)):
+            self._full_image_ycbcr[start_vert_idx_dst + i, start_horiz_idx_dst + j, comp] = dst[i, j]
 
     def _unsmear_mcus_into_full_image(self, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert):
         num_sub_mcus_horiz = pixels_mcu_horiz // 8
@@ -301,3 +303,21 @@ class RawDataDecoder:
                 self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, cr_unsmeared, 2)
 
         debug_print("Done unsmearing")
+
+
+def print_mat_by_components(mat):
+    for i in range(3):
+        debug_print(mat[:, :, i])
+
+
+Cred = 0.299
+Cgreen = 0.587
+Cblue = 0.114
+
+
+def get_rgb_from_ycbcr(y, cb, cr):
+    r = cr * (2 - 2 * Cred) + y
+    b = cb * (2 - 2 * Cblue) + y
+    g = (y - Cblue * b - Cred * r) / Cgreen
+
+    return round(r + 128), round(g + 128), round(b + 128)
