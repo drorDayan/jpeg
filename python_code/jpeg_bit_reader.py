@@ -13,6 +13,9 @@ class JpegBitReader:
         self._bit_idx = 0
         self._last_byte_is_FF = src_bytes[0] == 0xFF
 
+    def get_byte_location(self):
+        return self._byte_idx if self._bit_idx == 0 else self._byte_idx + 1
+
     def at_end(self):
         return self._byte_idx >= len(self._bytes)
 

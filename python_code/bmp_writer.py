@@ -33,7 +33,7 @@ class BmpWriter:
     def get_bytes_to_write(self, rgb_mat, width, height):
         to_write = bytearray(b"")
         bitmap_header = self._generate_bitmap_header()
-        bitmap_info_header = self.generate_bitmap_info_header(rgb_mat, width, height)
+        bitmap_info_header = self.generate_bitmap_info_header(width, height)
         color_palatte = bytearray(b"")  # No color palatte as we use 24bits for each pixel
         actual_image_data = self._generate_image_data(rgb_mat, width, height)
 
@@ -44,7 +44,7 @@ class BmpWriter:
 
         return to_write
 
-    def generate_bitmap_info_header(self, rgb_mat, width, height):
+    def generate_bitmap_info_header(self, width, height):
         to_write = bytearray()
 
         to_write += bytearray(self._info_header_size.to_bytes(4, self._endianess))
@@ -73,4 +73,14 @@ class BmpWriter:
         return to_write
 
     def _generate_image_data(self, rgb_mat, width, height):
-        return bytearray()
+        padding_num = ((4 - ((width * 3) % 4)) % 4)
+        to_write = bytearray()
+        for i in range(height):
+            row_idx = height - 1 - i
+            for col_idx in range(width):
+                to_write.append(rgb_mat[row_idx, col_idx, 2])
+                to_write.append(rgb_mat[row_idx, col_idx, 1])
+                to_write.append(rgb_mat[row_idx, col_idx, 0])
+            for i in range(padding_num):
+                to_write.append(0)
+        return to_write

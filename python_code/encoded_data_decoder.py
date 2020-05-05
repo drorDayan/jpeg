@@ -61,9 +61,10 @@ class RawDataDecoder:
         self.raw_data = raw_data
         self.jpeg_decode_metadata = jpeg_decode_metadata
         self._decoded_mcu_list = []
+        
         # DROR: change alg and remove:
-        self._unsmeared_mcu_matrix = {}  # will be (i,j) -> triplet of 8*8 numpy matrix of ycbcr
-        self._rgb_matrix = {}  # will be (i,j) ->triplet 8*8 numpy matrix of rgbs
+
+        self._full_image = np.zeros((self.jpeg_decode_metadata.height, self.jpeg_decode_metadata.width), dtype=(int, 3))
 
         # DROR: we live in the YCbCr to RGB function
         self.Cred = 0.299
@@ -119,8 +120,11 @@ class RawDataDecoder:
         for decoded_mcu in self._decoded_mcu_list:
             for comp_id in component_keys:
                 for comp_mcu in decoded_mcu.dequantized_mcus[comp_id]:
-                    after_idct = scipy.fft.idct(comp_mcu)
+                    after_idct = scipy.fft.idct(scipy.fft.idct(comp_mcu.T).T)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
+
+    #TODO
+    # Understand 2D-DCT : https://stackoverflow.com/questions/15978468/using-the-scipy-dct-function-to-create-a-2d-dct-ii
 
     # The jpeg MCUs are simply placed one after the other, therefore decoding them must be in order.
     # Here, each decoding step is done for every MCU, one by one.
@@ -144,20 +148,21 @@ class RawDataDecoder:
 
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
         self.inverse_dct(self.jpeg_decode_metadata.components_to_metadata.keys())
-        self.generate_pixel_map()
-        self.unsmear_mcus(self.jpeg_decode_metadata.components_to_metadata, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz,
-                          pixels_mcu_vert)
+
+        self._unsmear_mcus_into_full_image(n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert)
+
+        debug_print("Before RGB")
+
+        debug_print(self._full_image)
+
         self._to_rgb()
 
+        debug_print(self._full_image)
         bmp_writer = BmpWriter()
-        bmp_writer.write_from_rgb(self._rgb_matrix, width=n_mcu_horiz * pixels_mcu_horiz,
+        bmp_writer.write_from_rgb(self._full_image, width=n_mcu_horiz * pixels_mcu_horiz,
                                   height=n_mcu_vert * pixels_mcu_vert)
 
-        '''
-        TODO:
-        * merge unsmeared mcu to a single matrix per color component
-        * finish bmp scanning with bigbig matrix
-        '''
+        return bit_reader.get_byte_location(), self._full_image
 
     @staticmethod
     def decode_with_huffman(bit_reader, huff_tree):
@@ -234,55 +239,65 @@ class RawDataDecoder:
         debug_print(decoded_component_data)
         return decoded_component_data
 
-    def unsmear_mcus(self, components, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert):
-        num_unsmeared_horiz = pixels_mcu_horiz // 8
-        num_unsmeared_verti = pixels_mcu_vert // 8
-        assert (1 <= num_unsmeared_horiz <= 2 and 1 <= num_unsmeared_verti <= 2)
-
-        for decoded_mcu_idx in range(len(self._decoded_mcu_list)):
-
-            decoded_mcu = self._decoded_mcu_list[decoded_mcu_idx]
-            assert all(len(decoded_mcu.mcus_after_idct[i]) == 1 for i in range(2, 4))
-            for horiz_idx, vert_idx in itertools.product(range(num_unsmeared_horiz), range(num_unsmeared_verti)):
-                y_mcu = decoded_mcu.mcus_after_idct[1][num_unsmeared_horiz * vert_idx + horiz_idx]
-
-                def fill_up_unsmeared(orig, horiz_start_offset, vert_start_offset):
-                    mat = np.zeros((8, 8))
-                    for h, v in itertools.product(range(8), range(8)):
-                        h_idx = horiz_start_offset + h // 2
-                        v_idx = vert_start_offset + v // 2
-                        mat[h, v] = orig[h_idx, v_idx]
-                    return mat
-
-                horiz_start_offset = (8 // num_unsmeared_horiz) * horiz_idx
-                vert_start_offset = (8 // num_unsmeared_verti) * vert_idx
-
-                cb_unsmeared = fill_up_unsmeared(decoded_mcu.mcus_after_idct[2][0], horiz_start_offset,
-                                                 vert_start_offset)
-                cr_unsmeared = fill_up_unsmeared(decoded_mcu.mcus_after_idct[3][0], horiz_start_offset,
-                                                 vert_start_offset)
-
-                horiz_unsmeared_idx = (decoded_mcu_idx % num_unsmeared_horiz) * (pixels_mcu_horiz // 8) + horiz_idx
-                verti_unsmeared_idx = (decoded_mcu_idx // num_unsmeared_horiz) * (pixels_mcu_vert // 8) + vert_idx
-                unsmeared = UnsmearedMcu({0: y_mcu, 1: cb_unsmeared, 2: cr_unsmeared})
-                self._unsmeared_mcu_matrix[horiz_unsmeared_idx, verti_unsmeared_idx] = unsmeared
-
-        debug_print("Done unsmearing")
 
     def _to_rgb(self):
         def get_rgb_from_ycbcr(y, cb, cr):
             r = cr * (2 - 2 * self.Cred) + y
             b = cb * (2 - 2 * self.Cblue) + y
             g = (y - self.Cblue * b - self.Cred * r) / self.Cgreen
-            return r, g, b
+            return r + 128, g + 128, b + 128
 
-        for (i, j), y_cb_cr_mat in self._unsmeared_mcu_matrix.items():
-            self._rgb_matrix[i, j] = {i: np.zeros((8, 8)) for i in range(number_of_components)}
-            for row, col in itertools.product(range(8), range(8)):
-                new_colors = get_rgb_from_ycbcr(*[y_cb_cr_mat.color_components[i][row, col] for i in range(number_of_components)])
-                assert (all([0 <= new_colors[color_component] + 128 <= 255 for color_component in range(number_of_components)]))
-
-                for color_component in range(number_of_components):
-                    self._rgb_matrix[i, j][color_component][row, col] = new_colors[color_component] + 128
+        for (i, j) in itertools.product(range(self.jpeg_decode_metadata.height), range(self.jpeg_decode_metadata.width)):
+            self._full_image[i, j] = get_rgb_from_ycbcr(*self._full_image[i,j])
 
         debug_print("Done YCbCr -> RGB transformation")
+
+    def copy_to_full_image(self, start_horiz_idx_dst, start_vert_idx_dst, dst, comp):
+        assert dst.shape[0] + start_vert_idx_dst <= self._full_image.shape[0] and \
+               dst.shape[1] + start_horiz_idx_dst <= self._full_image.shape[1] and 0 <= comp <= 2
+        for i,j in itertools.product(range(8), range(8)):
+            self._full_image[start_vert_idx_dst+i, start_horiz_idx_dst+j, comp] = dst[i,j]
+
+    def _unsmear_mcus_into_full_image(self, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert):
+        num_sub_mcus_horiz = pixels_mcu_horiz // 8
+        num_sub_mcus_vert = pixels_mcu_vert // 8
+
+        assert (1 <= num_sub_mcus_horiz <= 2 and 1 <= num_sub_mcus_vert <= 2)
+
+        for decoded_mcu_idx in range(len(self._decoded_mcu_list)):
+            decoded_mcu = self._decoded_mcu_list[decoded_mcu_idx]
+            assert all(len(decoded_mcu.mcus_after_idct[i]) == 1 for i in range(2, 4))
+
+            mcu_horiz_start_idx = (decoded_mcu_idx % n_mcu_horiz) * (pixels_mcu_horiz // 8)
+            mcu_vert_start_idx = (decoded_mcu_idx // n_mcu_horiz) * (pixels_mcu_vert // 8)
+
+            for horiz_idx, vert_idx in itertools.product(range(num_sub_mcus_horiz), range(num_sub_mcus_vert)):
+
+                sub_mcu_horiz_start_idx = (mcu_horiz_start_idx + horiz_idx) * 8
+                sub_mcu_vert_start_idx = (mcu_vert_start_idx + vert_idx) * 8
+
+                y_mcu = decoded_mcu.mcus_after_idct[1][num_sub_mcus_horiz * vert_idx + horiz_idx]
+                self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, y_mcu, 0)
+
+                def fill_up_unsmeared(orig, horiz_start, vert_start):
+                    mat = np.zeros((8, 8))
+                    for h, v in itertools.product(range(8), range(8)):
+                        h_idx = horiz_start + h // 2
+                        v_idx = vert_start + v // 2
+                        mat[h, v] = orig[h_idx, v_idx]
+                    return mat
+
+                horiz_start_offset = (8 // num_sub_mcus_horiz) * horiz_idx
+                vert_start_offset = (8 // num_sub_mcus_vert) * vert_idx
+
+                cb_unsmeared = fill_up_unsmeared(decoded_mcu.mcus_after_idct[2][0], horiz_start_offset,
+                                                 vert_start_offset)
+
+                self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, cb_unsmeared, 1)
+
+                cr_unsmeared = fill_up_unsmeared(decoded_mcu.mcus_after_idct[3][0], horiz_start_offset,
+                                                 vert_start_offset)
+
+                self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, cr_unsmeared, 2)
+
+        debug_print("Done unsmearing")
