@@ -93,16 +93,17 @@ class RawDataDecoder:
             if restart_interval is not None and mcu_idx > 0 and (mcu_idx % restart_interval == 0):
                 prev_dc_value = {k: 0 for k in components.keys()}
                 rst_idx = self.handle_restart_interval(bit_reader, rst_idx)
-            else:
-                debug_print(f"Decoding MCU #{mcu_idx}")
-                parsed_mcu = McuParsedDctComponents(components.keys())
 
-                for (comp_id, comp) in components.items():
-                    for _ in range(comp.number_of_instances_in_mcu):
-                        decoded_mcu = self.decode_component_in_mcu(bit_reader, comp.ac_huffman_table,
-                                                                   comp.dc_huffman_table, prev_dc_value, comp_id)
-                        parsed_mcu.add_mcu(comp_id, decoded_mcu)
-                self._decoded_mcu_list.append(parsed_mcu)
+            if mcu_idx % 1000 == 0:
+                debug_print(f"Decoding MCU #{mcu_idx}")
+            parsed_mcu = McuParsedDctComponents(components.keys())
+
+            for (comp_id, comp) in components.items():
+                for _ in range(comp.number_of_instances_in_mcu):
+                    decoded_mcu = self.decode_component_in_mcu(bit_reader, comp.ac_huffman_table,
+                                                               comp.dc_huffman_table, prev_dc_value, comp_id)
+                    parsed_mcu.add_mcu(comp_id, decoded_mcu)
+            self._decoded_mcu_list.append(parsed_mcu)
 
     def de_quantize(self, components):
         debug_print("Beginning De-quantization")
@@ -154,6 +155,7 @@ class RawDataDecoder:
         self.inverse_dct(self.jpeg_decode_metadata.components_to_metadata.keys())
 
         self._unsmear_mcus_into_full_image(n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert)
+
 
         # debug_print("YCbCr Matrices:")
         #

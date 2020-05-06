@@ -36,10 +36,10 @@ class JpegBitReader:
                         self._last_byte_is_FF = True
                     elif self._last_byte_is_FF:
                         if self._bytes[self._byte_idx] == 0:
-                            print("FF00 Happened!")
+                 #           print("FF00 Happened!")
                             self._byte_idx += 1
                         else:
-                            print(f"BAD MARKER: FF{hex(self._bytes[self._byte_idx])} ") #TODO this is not a bad marker upupu
+                        #    print(f"BAD MARKER: FF{hex(self._bytes[self._byte_idx])} ") #TODO this is not a bad marker upupu
                            # raise Exception("IEEE MARKER HERE")
                         self._last_byte_is_FF = False
 
