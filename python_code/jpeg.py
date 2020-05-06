@@ -49,7 +49,7 @@ class Jpeg:
         self._markers_to_skip = {i for i in range(0xe1, 0xef + 1)} | {0xe0}
 
     def parse(self):
-        debug_print("Started parsing!")
+        info_print("Started parsing!")
         # DROR what are this consts? and are they full i.e. exif and jfif
         if self._jpg_data[0] != 0xff or self._jpg_data[1] != 0xd8:
             raise Exception("Illegal SOI")
@@ -75,21 +75,21 @@ class Jpeg:
             idx_in_file += (2 + marker_size)  # This is including the size and not including the 0xYY marker (so 4-2=2).
 
             if not is_continue:
-                debug_print("SOS read. Starting decoding")
+                info_print("SOS read. Starting decoding")
                 self.finalize_metadata()
-                debug_print("Finished finalizing metadata!")
+                info_print("Finished finalizing metadata!")
 
                 bytes_read, image, actual_width, actual_height = self.decode_raw_data(idx_in_file)
                 idx_in_file += bytes_read
                 image_matrix = image
-                debug_print("Picture decoded!")
-        debug_print("Parsing completed!")
-        debug_print("Beginning BMP creation!")
+                info_print("Picture decoded!")
+        info_print("Parsing completed!")
+        info_print("Beginning BMP creation!")
         if image_matrix is None or actual_height is None or actual_width is None:
             raise Exception("Error in retrieving image data")
         bmp_writer = BmpWriter()
         bmp_writer.write_from_rgb(image_matrix, width=actual_width, height=actual_height)
-        debug_print("Finished creating BMP!")
+        info_print("Finished creating BMP!")
 
     def decode_raw_data(self, start_idx):
         decoder = RawDataDecoder(self._jpg_data[start_idx:], self.jpeg_decode_metadata)

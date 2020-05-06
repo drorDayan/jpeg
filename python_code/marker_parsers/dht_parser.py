@@ -1,4 +1,4 @@
-from jpeg_common import debug_print
+from jpeg_common import *
 from marker_parsers.i_parser import IParser
 
 
@@ -50,7 +50,7 @@ class DhtParser(IParser):
     max_num_symbols = 256
 
     def parse(self, jpg, raw_marker):
-        debug_print("DHT parser started")
+        info_print("DHT parser started")
         idx = 0
         while idx < len(raw_marker):
             # Start parsing a new table
@@ -73,7 +73,7 @@ class DhtParser(IParser):
             jpg.add_huffman_table(huff_table)
             idx += symbols_part_length
 
-        debug_print("DHT parser ended successfully")
+        info_print("DHT parser ended successfully")
         return True
 
     @staticmethod

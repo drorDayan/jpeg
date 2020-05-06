@@ -1,3 +1,6 @@
+from jpeg_common import *
+
+
 def bit_getter(i):
     return lambda byte: ((byte & (1 << (7-i))) > 0)
 
@@ -36,11 +39,8 @@ class JpegBitReader:
                         self._last_byte_is_FF = True
                     elif self._last_byte_is_FF:
                         if self._bytes[self._byte_idx] == 0:
-                 #           print("FF00 Happened!")
+                            debug_print("FF00 Happened!")
                             self._byte_idx += 1
-                        else:
-                        #    print(f"BAD MARKER: FF{hex(self._bytes[self._byte_idx])} ") #TODO this is not a bad marker upupu
-                           # raise Exception("IEEE MARKER HERE")
                         self._last_byte_is_FF = False
 
         return bits_to_return

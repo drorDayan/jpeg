@@ -6,7 +6,7 @@ import scipy as scipy
 
 from bmp_writer import BmpWriter
 from jpeg_bit_reader import JpegBitReader
-from jpeg_common import debug_print, number_of_components
+from jpeg_common import *
 
 
 # lookup table you ugly bugly
@@ -106,7 +106,7 @@ class RawDataDecoder:
             self._decoded_mcu_list.append(parsed_mcu)
 
     def de_quantize(self, components):
-        debug_print("Beginning De-quantization")
+        info_print("Beginning De-quantization")
         for decoded_mcu in self._decoded_mcu_list:
             for (comp_id, comp) in components.items():
                 quantization_table = comp.quantization_table
@@ -115,10 +115,10 @@ class RawDataDecoder:
                     # if comp_id == 1:
                     #     debug_print(de_quantized_mcu)
                     decoded_mcu.dequantized_mcus[comp_id].append(de_quantized_mcu)
-        debug_print("Finish De-quantization")
+        info_print("Finish De-quantization")
 
     def inverse_dct(self, component_keys):
-        debug_print("Beginning IDCT")
+        info_print("Beginning IDCT")
         for decoded_mcu in self._decoded_mcu_list:
             for comp_id in component_keys:
                 for comp_mcu in decoded_mcu.dequantized_mcus[comp_id]:
@@ -126,7 +126,7 @@ class RawDataDecoder:
                     # if comp_id == 1:
                     #     debug_print(after_idct)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
-        debug_print("Finished IDCT")
+        info_print("Finished IDCT")
 
     # TODO
     # Understand 2D-DCT : https://stackoverflow.com/questions/15978468/using-the-scipy-dct-function-to-create-a-2d-dct-ii
@@ -245,13 +245,13 @@ class RawDataDecoder:
 
     def _to_rgb(self):
 
-        debug_print("Beginning YCbCr -> RGB transformation")
+        info_print("Beginning YCbCr -> RGB transformation")
         for (i, j) in itertools.product(range(self.jpeg_decode_metadata.height),
                                         range(self.jpeg_decode_metadata.width)):
             rgb_values = get_rgb_from_ycbcr(*self._full_image_ycbcr[i, j])
             self._full_image_rgb[i, j] = rgb_values
 
-        debug_print("Finished YCbCr -> RGB transformation")
+        info_print("Finished YCbCr -> RGB transformation")
 
     def copy_to_full_image(self, start_horiz_idx_dst, start_vert_idx_dst, dst, comp):
         assert dst.shape[0] + start_vert_idx_dst <= self._full_image_ycbcr.shape[0] and \
@@ -259,6 +259,7 @@ class RawDataDecoder:
         for i, j in itertools.product(range(8), range(8)):
             self._full_image_ycbcr[start_vert_idx_dst + i, start_horiz_idx_dst + j, comp] = dst[i, j]
 
+    # TODO rename, this has nothing to do with smearing, this is just construct pixel map
     def _unsmear_mcus_into_full_image(self, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert):
         num_sub_mcus_horiz = pixels_mcu_horiz // 8
         num_sub_mcus_vert = pixels_mcu_vert // 8
@@ -270,7 +271,7 @@ class RawDataDecoder:
             assert all(len(decoded_mcu.mcus_after_idct[i]) == 1 for i in range(2, 4))
 
             mcu_horiz_start_idx = (decoded_mcu_idx % n_mcu_horiz) * (pixels_mcu_horiz // 8)
-            mcu_vert_start_idx = (decoded_mcu_idx // n_mcu_horiz) * (pixels_mcu_vert // 8)
+            mcu_vert_start_idx = (decoded_mcu_idx // n_mcu_horiz) * (pixels_mcu_vert // 8)  # TODO: bug? (n_mcu_horiz)
 
             for horiz_idx, vert_idx in itertools.product(range(num_sub_mcus_horiz), range(num_sub_mcus_vert)):
 
@@ -301,9 +302,10 @@ class RawDataDecoder:
 
                 self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, cr_unsmeared, 2)
 
-        debug_print("Done unsmearing")
+        info_print("Done unsmearing")  # TODO after all that above rename this and add an info print in the first line
 
 
+# DROR I am hurt in my performance muscle
 def print_mat_by_components(mat):
     for i in range(3):
         debug_print(mat[:, :, i])

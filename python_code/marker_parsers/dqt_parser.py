@@ -6,7 +6,7 @@ from jpeg_common import *
 
 class DqtParser(IParser):
     def parse(self, jpg, raw_marker):
-        debug_print("DQT parser started")
+        info_print("DQT parser started")
         idx = 0
         while idx < len(raw_marker):
             # bits 4-7 are precision, 0 is 8 bits, otherwise 16 bit
@@ -20,10 +20,10 @@ class DqtParser(IParser):
                 raise Exception("illegal table_id")
             idx += 1
 
-            new_table = numpy.zeros((8,8))
+            new_table = numpy.zeros((8, 8))
             for i in range(table_length):
                 new_table[i // 8, i % 8] = raw_marker[idx+i]
             idx += table_length
             jpg.add_quantization_table(table_id, new_table)
-        debug_print("DQT parser ended successfully")
+        info_print("DQT parser ended successfully")
         return True

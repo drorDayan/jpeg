@@ -1,9 +1,9 @@
-level = "debug"
+level = "info"
 number_of_components = 3
 
 
 def debug_print(*arg, newline=True):
-    if level == "debug" or level == "info":
+    if level == "debug":
         if newline:
             print(*arg)
         if not newline:
@@ -11,7 +11,7 @@ def debug_print(*arg, newline=True):
 
 
 def info_print(*arg, newline=True):
-    if level == "info":
+    if level == "info" or level == "debug":
         if newline:
             print(*arg)
         if not newline:

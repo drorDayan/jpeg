@@ -11,7 +11,7 @@ class Sof0Parser(IParser):
     single_component_data_len = 3
 
     def parse(self, jpg, raw_marker):
-        debug_print("Sof0 parser started")
+        info_print("Sof0 parser started")
 
         assert raw_marker[Sof0Parser.precision_idx] == 8, "precision should be 8"
 
@@ -37,5 +37,5 @@ class Sof0Parser(IParser):
             jpg.add_component_quantization_table(comp_id, quantization_table_id)
             jpg.add_component_sample_factors(comp_id, (horizontal_sample_factor, vertical_sample_factor))
 
-        debug_print("Sof0 parser ended successfully")
+        info_print("Sof0 parser ended successfully")
         return True
