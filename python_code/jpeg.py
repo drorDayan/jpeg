@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from bmp_writer import BmpWriter
 from encoded_data_decoder import RawDataDecoder
 from jpeg_common import *
 from marker_parsers.dht_parser import DhtParser, HuffTable
@@ -54,8 +55,12 @@ class Jpeg:
             raise Exception("Illegal SOI")
 
         idx_in_file = 2
-        is_continue = True
-        while idx_in_file < len(self._jpg_data) and is_continue:
+
+        image_matrix = None
+        actual_width = actual_height = None
+
+        while idx_in_file < len(self._jpg_data):
+            is_continue = True
             marker = self._jpg_data[idx_in_file:idx_in_file + 2]
             marker_size = int.from_bytes(self._jpg_data[idx_in_file + 2: idx_in_file + 4], byteorder='big')
             marker_type = marker[1]
@@ -68,16 +73,28 @@ class Jpeg:
                 start_idx = idx_in_file + 4
                 is_continue = parser.parse(self, self._jpg_data[start_idx: start_idx + marker_size - 2])
             idx_in_file += (2 + marker_size)  # This is including the size and not including the 0xYY marker (so 4-2=2).
-        self.finalize_metadata()
-        debug_print("Finished finalizing metadata!")
-        # TODO change this method to read things after the raw data
-        self.decode_raw_data(idx_in_file)
+
+            if not is_continue:
+                debug_print("SOS read. Starting decoding")
+                self.finalize_metadata()
+                debug_print("Finished finalizing metadata!")
+
+                bytes_read, image, actual_width, actual_height = self.decode_raw_data(idx_in_file)
+                idx_in_file += bytes_read
+                image_matrix = image
+                debug_print("Picture decoded!")
         debug_print("Parsing completed!")
+        debug_print("Beginning BMP creation!")
+        if image_matrix is None or actual_height is None or actual_width is None:
+            raise Exception("Error in retrieving image data")
+        bmp_writer = BmpWriter()
+        bmp_writer.write_from_rgb(image_matrix, width=actual_width, height=actual_height)
+        debug_print("Finished creating BMP!")
 
     def decode_raw_data(self, start_idx):
         decoder = RawDataDecoder(self._jpg_data[start_idx:], self.jpeg_decode_metadata)
-        new_idx, image = decoder.decode()
-        return new_idx
+        new_idx, image, actual_width, actual_height = decoder.decode()
+        return new_idx, image, actual_width, actual_height
 
     def add_huffman_table(self, huff_table):
         table_id = huff_table.get_table_id()

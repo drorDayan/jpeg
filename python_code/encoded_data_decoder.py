@@ -111,8 +111,8 @@ class RawDataDecoder:
                 quantization_table = comp.quantization_table
                 for comp_mcu in decoded_mcu.raw_mcus[comp_id]:
                     de_quantized_mcu = np.multiply(quantization_table, comp_mcu)
-                    if comp_id == 1:
-                        debug_print(de_quantized_mcu)
+                    # if comp_id == 1:
+                    #     debug_print(de_quantized_mcu)
                     decoded_mcu.dequantized_mcus[comp_id].append(de_quantized_mcu)
         debug_print("Finish De-quantization")
 
@@ -122,8 +122,8 @@ class RawDataDecoder:
             for comp_id in component_keys:
                 for comp_mcu in decoded_mcu.dequantized_mcus[comp_id]:
                     after_idct = scipy.fft.idct(scipy.fft.idct(comp_mcu.T, norm='ortho').T, norm='ortho')
-                    if comp_id == 1:
-                        debug_print(after_idct)
+                    # if comp_id == 1:
+                    #     debug_print(after_idct)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
         debug_print("Finished IDCT")
 
@@ -155,19 +155,16 @@ class RawDataDecoder:
 
         self._unsmear_mcus_into_full_image(n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert)
 
-        debug_print("YCbCr Matrices:")
-
-        print_mat_by_components(self._full_image_ycbcr)
+        # debug_print("YCbCr Matrices:")
+        #
+        # print_mat_by_components(self._full_image_ycbcr)
 
         self._to_rgb()
-        debug_print("RGB Matrices:")
+        # debug_print("RGB Matrices:")
+        #
+        # print_mat_by_components(self._full_image_rgb)
 
-        print_mat_by_components(self._full_image_rgb)
-        bmp_writer = BmpWriter()
-        bmp_writer.write_from_rgb(self._full_image_rgb, width=n_mcu_horiz * pixels_mcu_horiz,
-                                  height=n_mcu_vert * pixels_mcu_vert)
-
-        return bit_reader.get_byte_location(), self._full_image_rgb
+        return bit_reader.get_byte_location(), self._full_image_rgb, n_mcu_horiz * pixels_mcu_horiz, n_mcu_vert * pixels_mcu_vert
 
     @staticmethod
     def decode_with_huffman(bit_reader, huff_tree):
@@ -240,8 +237,8 @@ class RawDataDecoder:
 
         self.decode_ac_for_component_in_mcu(ac_huffman.get_tree(), bit_reader, decoded_component_data)
 
-        debug_print('Done decoding component')
-        debug_print(decoded_component_data)
+        # debug_print('Done decoding component')
+        # debug_print(decoded_component_data)
         return decoded_component_data
 
     def _to_rgb(self):
