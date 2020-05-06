@@ -1,4 +1,4 @@
-level = "info"
+level = "debug"
 number_of_components = 3
 
 

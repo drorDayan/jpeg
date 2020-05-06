@@ -1,3 +1,4 @@
+import numpy
 class BmpWriter:
     def __init__(self):
         self._endianess = 'little'
@@ -72,23 +73,24 @@ class BmpWriter:
 
         return to_write
 
-    def _generate_image_data(self, rgb_mat, width, height):
+    @staticmethod
+    def _generate_image_data(rgb_mat, width, height):
         padding_num = ((4 - ((width * 3) % 4)) % 4)
         to_write = bytearray()
         try:
             for i in range(height):
                 row_idx = height - 1 - i
                 for col_idx in range(width):
-                    to_write.append(rgb_mat[row_idx, col_idx, 2])
-                    to_write.append(rgb_mat[row_idx, col_idx, 1])
-                    to_write.append(rgb_mat[row_idx, col_idx, 0])
+                    to_write.append(int(rgb_mat[row_idx, col_idx, 2]))
+                    to_write.append(int(rgb_mat[row_idx, col_idx, 1]))
+                    to_write.append(int(rgb_mat[row_idx, col_idx, 0]))
                 for i in range(padding_num):
                     to_write.append(0)
             return to_write
         except Exception as e:
-            print("ERROR IN BMP WRITING: ")
+            print('BADD')
             print(e)
-            print("EXPORTING MATRIX!!")
-            f = open('error_matrix.txt' ,'w')
-            f.write(str(rgb_mat))
-            f.close()
+            numpy.savetxt('error_matrix2_R.txt', rgb_mat[:,:,0])
+            numpy.savetxt('error_matrix2_G.txt', rgb_mat[:,:,1])
+            numpy.savetxt('error_matrix2_B.txt', rgb_mat[:,:,2])
+        return bytearray()

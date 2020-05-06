@@ -8,6 +8,9 @@ from bmp_writer import BmpWriter
 from jpeg_bit_reader import JpegBitReader
 from jpeg_common import *
 
+Cred = 0.299
+Cgreen = 0.587
+Cblue = 0.114
 
 # lookup table you ugly bugly
 def zig_zag_index(k, n=8):
@@ -156,7 +159,6 @@ class RawDataDecoder:
 
         self._unsmear_mcus_into_full_image(n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert)
 
-
         # debug_print("YCbCr Matrices:")
         #
         # print_mat_by_components(self._full_image_ycbcr)
@@ -243,13 +245,20 @@ class RawDataDecoder:
         # debug_print(decoded_component_data)
         return decoded_component_data
 
+
     def _to_rgb(self):
 
+        transformation_matrix = np.matrix(
+            [[1, 0, (2 - 2 * Cred)], [1, (-Cblue / Cgreen)*(2-2*Cblue), (- Cred / Cgreen)*(2-2*Cred)], [1, (2 - 2 * Cblue), 0]])
+
+        #        new_mat = [ for x in self._full_image_ycbcr]
         info_print("Beginning YCbCr -> RGB transformation")
-        for (i, j) in itertools.product(range(self.jpeg_decode_metadata.height),
-                                        range(self.jpeg_decode_metadata.width)):
-            rgb_values = get_rgb_from_ycbcr(*self._full_image_ycbcr[i, j])
-            self._full_image_rgb[i, j] = rgb_values
+
+        def inner_ycbcr_to_rgb(x):
+            r = np.matmul(transformation_matrix, x) + 128
+            return round(r[0, 0]), round(r[0, 1]), round(r[0, 2])
+
+        self._full_image_rgb = np.apply_along_axis(inner_ycbcr_to_rgb, 2, self._full_image_ycbcr)
 
         info_print("Finished YCbCr -> RGB transformation")
 
@@ -310,11 +319,8 @@ def print_mat_by_components(mat):
     for i in range(3):
         debug_print(mat[:, :, i])
 
-
-Cred = 0.299
-Cgreen = 0.587
-Cblue = 0.114
-
+def dror(x):
+    return get_rgb_from_ycbcr(*x)
 
 def get_rgb_from_ycbcr(y, cb, cr):
     r = cr * (2 - 2 * Cred) + y
