@@ -121,7 +121,7 @@ class RawDataDecoder:
         for decoded_mcu in self._decoded_mcu_list:
             for comp_id in component_keys:
                 for comp_mcu in decoded_mcu.dequantized_mcus[comp_id]:
-                    after_idct = scipy.fft.idct(scipy.fft.idct(comp_mcu.T).T)  # / (np.ones((8,8)) * 4)
+                    after_idct = scipy.fft.idct(scipy.fft.idct(comp_mcu.T, norm='ortho').T, norm='ortho')
                     if comp_id == 1:
                         debug_print(after_idct)
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
