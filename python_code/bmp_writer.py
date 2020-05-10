@@ -1,4 +1,8 @@
 import numpy
+
+from jpeg_common import debug_print
+
+
 class BmpWriter:
     def __init__(self):
         self._endianess = 'little'
@@ -80,10 +84,11 @@ class BmpWriter:
         try:
             for i in range(height):
                 row_idx = height - 1 - i
+                debug_print(f"Pringing row {row_idx} to BMP")
                 for col_idx in range(width):
-                    to_write.append(int(rgb_mat[row_idx, col_idx, 2]))
-                    to_write.append(int(rgb_mat[row_idx, col_idx, 1]))
-                    to_write.append(int(rgb_mat[row_idx, col_idx, 0]))
+                    for comp in range(3):
+                        comp_to_write = 2-comp
+                        to_write.append(int(rgb_mat[row_idx, col_idx, comp_to_write]))
                 for i in range(padding_num):
                     to_write.append(0)
             return to_write

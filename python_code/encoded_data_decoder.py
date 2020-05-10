@@ -12,6 +12,7 @@ Cred = 0.299
 Cgreen = 0.587
 Cblue = 0.114
 
+
 # lookup table you ugly bugly
 def zig_zag_index(k, n=8):
     # upper side of interval
@@ -33,8 +34,9 @@ def value_encoding(dc_code: int, additional_bits: int):
     additional_bits_to_add = additional_bits & ((1 << (dc_code - 1)) - 1)
 
     dc_value_base = (2 ** (dc_code - 1)) if dc_value_sign > 0 else (-1 * ((2 ** dc_code) - 1))
-
-    return dc_value_base + additional_bits_to_add
+    ret_val = dc_value_base + additional_bits_to_add
+    assert (dc_value_sign == -1 or additional_bits == ret_val)  # TODO do something with it!
+    return ret_val
 
 
 def put_value_in_matrix_zigzag(matrix, value, index):
@@ -167,6 +169,17 @@ class RawDataDecoder:
         # debug_print("RGB Matrices:")
         #
         # print_mat_by_components(self._full_image_rgb)
+        # debug_print("Faulty values:")
+        # for i in range(3):
+        #     for r , h in itertools.product(range(16), range(16)):
+        #         if not 0 <= self._full_image_rgb[r,h][i] <= 255:
+        #             debug_print(f"h={h}, r={r}, comp={i} val={self._full_image_rgb[r,h][i]}")
+        # debug_print("DONE Faulty values")
+
+        debug_print("YCbCr")
+        for i in range(3):
+            np.savetxt(f"ycbcr_{i}.txt", self._full_image_ycbcr[:, :, i])
+        debug_print("YCbCr")
 
         return bit_reader.get_byte_location(), self._full_image_rgb, n_mcu_horiz * pixels_mcu_horiz, n_mcu_vert * pixels_mcu_vert
 
@@ -245,11 +258,11 @@ class RawDataDecoder:
         # debug_print(decoded_component_data)
         return decoded_component_data
 
-
     def _to_rgb(self):
 
         transformation_matrix = np.matrix(
-            [[1, 0, (2 - 2 * Cred)], [1, (-Cblue / Cgreen)*(2-2*Cblue), (- Cred / Cgreen)*(2-2*Cred)], [1, (2 - 2 * Cblue), 0]])
+            [[1, 0, (2 - 2 * Cred)], [1, (-Cblue / Cgreen) * (2 - 2 * Cblue), (- Cred / Cgreen) * (2 - 2 * Cred)],
+             [1, (2 - 2 * Cblue), 0]])
 
         #        new_mat = [ for x in self._full_image_ycbcr]
         info_print("Beginning YCbCr -> RGB transformation")
@@ -319,8 +332,10 @@ def print_mat_by_components(mat):
     for i in range(3):
         debug_print(mat[:, :, i])
 
+
 def dror(x):
     return get_rgb_from_ycbcr(*x)
+
 
 def get_rgb_from_ycbcr(y, cb, cr):
     r = cr * (2 - 2 * Cred) + y
