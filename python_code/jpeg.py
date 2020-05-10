@@ -155,6 +155,7 @@ class Jpeg:
 
     def finalize_metadata(self):
         components_to_metadata = {}
+
         for comp_id in self._component_id_to_quantization_table_id.keys():
             ac_t = self._ac_huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][0]]
             dc_t = self._dc_huffman_tables[self._component_id_to_huffman_tables_ids[comp_id][1]]
@@ -167,6 +168,17 @@ class Jpeg:
         max_vertical_sample_factor = max([comp.vertical_sample_factor for comp in components_to_metadata.values()])
         min_horizontal_sample_factor = min([comp.horizontal_sample_factor for comp in components_to_metadata.values()])
         max_horizontal_sample_factor = max([comp.horizontal_sample_factor for comp in components_to_metadata.values()])
+
+        # We assume we only have 2 options for sample_factor, Ys option which is the higher one and the smaller one for
+        #  both Cb and Cr
+        assert max_vertical_sample_factor == components_to_metadata[Y_COMP_ID].vertical_sample_factor
+        assert max_horizontal_sample_factor == components_to_metadata[Y_COMP_ID].horizontal_sample_factor
+
+        for comp_id in self._component_id_to_quantization_table_id.keys():
+            if comp_id == Y_COMP_ID:
+                continue
+            assert min_vertical_sample_factor == components_to_metadata[comp_id].vertical_sample_factor
+            assert min_horizontal_sample_factor == components_to_metadata[comp_id].horizontal_sample_factor
 
         for comp in components_to_metadata.values():
             comp.number_of_instances_in_mcu = \

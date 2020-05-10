@@ -164,7 +164,7 @@ class RawDataDecoder:
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
         self.inverse_dct(self.jpeg_decode_metadata.components_to_metadata.keys())
 
-        self._unsmear_mcus_into_full_image(n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert)
+        self.construct_pixel_map(n_mcu_horiz, pixels_mcu_horiz, pixels_mcu_vert)
 
         # debug_print("YCbCr Matrices:")
         #
@@ -289,56 +289,51 @@ class RawDataDecoder:
 
         info_print("Finished YCbCr -> RGB transformation")
 
-    def copy_to_full_image(self, start_horiz_idx_dst, start_vert_idx_dst, dst, comp):
-        assert dst.shape[0] + start_vert_idx_dst <= self._full_image_ycbcr.shape[0] and \
-               dst.shape[1] + start_horiz_idx_dst <= self._full_image_ycbcr.shape[1] and 0 <= comp <= 2
-        for i, j in itertools.product(range(8), range(8)):
-            self._full_image_ycbcr[start_horiz_idx_dst + i, start_vert_idx_dst + j, comp] = dst[i, j]
+    def copy_to_full_image(self, start_row_idx_dst, start_col_idx_dst, dst, comp):
+        assert dst.shape[0] + start_row_idx_dst <= self._full_image_ycbcr.shape[0] and \
+               dst.shape[1] + start_col_idx_dst <= self._full_image_ycbcr.shape[1] and 0 <= comp <= 2
+        self._full_image_ycbcr[start_row_idx_dst: start_row_idx_dst+dst.shape[0], start_col_idx_dst:start_col_idx_dst + dst.shape[1], comp] = dst
+        # for i, j in itertools.product(range(8), range(8)):
+        #     self._full_image_ycbcr[start_row_idx_dst + i, start_col_idx_dst + j, comp] = dst[i, j]
 
-    # TODO rename, this has nothing to do with smearing, this is just construct pixel map
-    def _unsmear_mcus_into_full_image(self, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert):
-        num_sub_mcus_horiz = pixels_mcu_horiz // 8
-        num_sub_mcus_vert = pixels_mcu_vert // 8
+    def construct_pixel_map(self, n_mcu_horiz, pixels_mcu_horiz, pixels_mcu_vert):
+        info_print("constructing pixel map")
+        num_sub_mcus_in_row = pixels_mcu_horiz // 8
+        num_sub_mcus_in_col = pixels_mcu_vert // 8
 
-        assert (1 <= num_sub_mcus_horiz <= 2 and 1 <= num_sub_mcus_vert <= 2)
+        assert (1 <= num_sub_mcus_in_row <= 2 and 1 <= num_sub_mcus_in_col <= 2)
 
         for decoded_mcu_idx in range(len(self._decoded_mcu_list)):
             decoded_mcu = self._decoded_mcu_list[decoded_mcu_idx]
             assert all(len(decoded_mcu.mcus_after_idct[i]) == 1 for i in range(2, 4))
 
-            mcu_horiz_start_idx = (decoded_mcu_idx % n_mcu_horiz) * (pixels_mcu_horiz // 8)
-            mcu_vert_start_idx = (decoded_mcu_idx // n_mcu_horiz) * (pixels_mcu_vert // 8)  # TODO: bug? (n_mcu_horiz)
+            mcu_row_idx = (decoded_mcu_idx // n_mcu_horiz)
+            mcu_col_idx = (decoded_mcu_idx % n_mcu_horiz)
 
-            for horiz_idx, vert_idx in itertools.product(range(num_sub_mcus_horiz),  range(num_sub_mcus_vert)):
-                sub_mcu_horiz_start_idx = (mcu_horiz_start_idx + horiz_idx) * 8
-                sub_mcu_vert_start_idx = (mcu_vert_start_idx + vert_idx) * 8
+            def smear(orig):
+                mat = np.zeros((8*num_sub_mcus_in_col, 8*num_sub_mcus_in_row))
+                for r, c in itertools.product(range(8*num_sub_mcus_in_col), range(8*num_sub_mcus_in_row)):
+                    orig_r_idx = r // num_sub_mcus_in_col
+                    orig_c_idx = c // num_sub_mcus_in_row
+                    mat[r, c] = orig[orig_r_idx, orig_c_idx]
+                return mat
 
-                y_idx = num_sub_mcus_vert * horiz_idx + vert_idx
-                y_mcu = decoded_mcu.mcus_after_idct[1][y_idx]
-                self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, y_mcu, 0)
+            cb_smeared = smear(decoded_mcu.mcus_after_idct[CB_COMP_ID][0])
+            cr_smeared = smear(decoded_mcu.mcus_after_idct[CR_COMP_ID][0])
+            self.copy_to_full_image((mcu_row_idx * num_sub_mcus_in_col)*8, (mcu_col_idx * num_sub_mcus_in_row)*8,
+                                    cb_smeared, CB_INDEX_IN_YCBCR)
+            self.copy_to_full_image((mcu_row_idx * num_sub_mcus_in_col)*8, (mcu_col_idx * num_sub_mcus_in_row)*8,
+                                    cr_smeared, CR_INDEX_IN_YCBCR)
+            # A sub_mcu is a 8X8 pixel matrix
+            for sub_mcu_col_idx, sub_mcu_row_idx in \
+                    itertools.product(range(num_sub_mcus_in_row), range(num_sub_mcus_in_col)):
 
-                def fill_up_unsmeared(orig, horiz_start, vert_start):
-                    mat = np.zeros((8, 8))
-                    for h, v in itertools.product(range(8), range(8)):
-                        h_idx = horiz_start + h // 2
-                        v_idx = vert_start + v // 2
-                        mat[h, v] = orig[h_idx, v_idx]
-                    return mat
+                y_mcu_idx = sub_mcu_row_idx*num_sub_mcus_in_row + sub_mcu_col_idx
+                y_mcu = decoded_mcu.mcus_after_idct[Y_COMP_ID][y_mcu_idx]
+                self.copy_to_full_image((mcu_row_idx*num_sub_mcus_in_col+sub_mcu_row_idx) * 8,
+                                        (mcu_col_idx * num_sub_mcus_in_row + sub_mcu_col_idx) * 8, y_mcu, Y_INDEX_IN_YCBCR)
 
-                horiz_start_offset = (8 // num_sub_mcus_horiz) * horiz_idx
-                vert_start_offset = (8 // num_sub_mcus_vert) * vert_idx
-
-                cb_unsmeared = fill_up_unsmeared(decoded_mcu.mcus_after_idct[2][0], horiz_start_offset,
-                                                 vert_start_offset)
-
-                self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, cb_unsmeared, 1)
-
-                cr_unsmeared = fill_up_unsmeared(decoded_mcu.mcus_after_idct[3][0], horiz_start_offset,
-                                                 vert_start_offset)
-
-                self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, cr_unsmeared, 2)
-
-        info_print("Done unsmearing")  # TODO after all that above rename this and add an info print in the first line
+        info_print("Done constructing pixel map")
 
 
 # DROR I am hurt in my performance muscle
