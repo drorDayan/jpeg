@@ -109,6 +109,7 @@ class RawDataDecoder:
                                                                comp.dc_huffman_table, prev_dc_value, comp_id)
                     parsed_mcu.add_mcu(comp_id, decoded_mcu)
             self._decoded_mcu_list.append(parsed_mcu)
+        bit_reader.align()
 
     def de_quantize(self, components):
         info_print("Beginning De-quantization")
