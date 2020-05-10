@@ -130,6 +130,10 @@ class RawDataDecoder:
                     after_idct = scipy.fft.idct(scipy.fft.idct(comp_mcu.T, norm='ortho').T, norm='ortho')
                     # if comp_id == 1:
                     #     debug_print(after_idct)
+                    # TODO remove me
+                    # for i,j in itertools.product(range(after_idct.shape[0]), range(after_idct.shape[1])):
+                    #     if after_idct[i,j] <0:
+                    #         print(f"")
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
         info_print("Finished IDCT")
 
@@ -261,14 +265,23 @@ class RawDataDecoder:
     def _to_rgb(self):
 
         transformation_matrix = np.matrix(
-            [[1, 0, (2 - 2 * Cred)], [1, (-Cblue / Cgreen) * (2 - 2 * Cblue), (- Cred / Cgreen) * (2 - 2 * Cred)],
+            [[1, 0, (2 - 2 * Cred)],
+             [1, (-Cblue / Cgreen) * (2 - 2 * Cblue), (- Cred / Cgreen) * (2 - 2 * Cred)],
              [1, (2 - 2 * Cblue), 0]])
 
         #        new_mat = [ for x in self._full_image_ycbcr]
         info_print("Beginning YCbCr -> RGB transformation")
 
         def inner_ycbcr_to_rgb(x):
-            r = np.matmul(transformation_matrix, x) + 128
+            y = x + 128
+            for i in range(y.shape[0]):
+                if not -0.001 <= y[i] <= 255.001:
+                    print(f"OH noooo!! {y[i]}")
+            y_tag = y
+            y_tag[1] -= 128
+            y_tag[2] -= 128
+            r = np.matmul(transformation_matrix, y_tag)
+            # r = np.matmul(transformation_matrix, x) + 128
             return round(r[0, 0]), round(r[0, 1]), round(r[0, 2])
 
         self._full_image_rgb = np.apply_along_axis(inner_ycbcr_to_rgb, 2, self._full_image_ycbcr)
@@ -279,7 +292,7 @@ class RawDataDecoder:
         assert dst.shape[0] + start_vert_idx_dst <= self._full_image_ycbcr.shape[0] and \
                dst.shape[1] + start_horiz_idx_dst <= self._full_image_ycbcr.shape[1] and 0 <= comp <= 2
         for i, j in itertools.product(range(8), range(8)):
-            self._full_image_ycbcr[start_vert_idx_dst + i, start_horiz_idx_dst + j, comp] = dst[i, j]
+            self._full_image_ycbcr[start_horiz_idx_dst + i, start_vert_idx_dst + j, comp] = dst[i, j]
 
     # TODO rename, this has nothing to do with smearing, this is just construct pixel map
     def _unsmear_mcus_into_full_image(self, n_mcu_horiz, n_mcu_vert, pixels_mcu_horiz, pixels_mcu_vert):
@@ -295,12 +308,12 @@ class RawDataDecoder:
             mcu_horiz_start_idx = (decoded_mcu_idx % n_mcu_horiz) * (pixels_mcu_horiz // 8)
             mcu_vert_start_idx = (decoded_mcu_idx // n_mcu_horiz) * (pixels_mcu_vert // 8)  # TODO: bug? (n_mcu_horiz)
 
-            for horiz_idx, vert_idx in itertools.product(range(num_sub_mcus_horiz), range(num_sub_mcus_vert)):
-
+            for horiz_idx, vert_idx in itertools.product(range(num_sub_mcus_horiz),  range(num_sub_mcus_vert)):
                 sub_mcu_horiz_start_idx = (mcu_horiz_start_idx + horiz_idx) * 8
                 sub_mcu_vert_start_idx = (mcu_vert_start_idx + vert_idx) * 8
 
-                y_mcu = decoded_mcu.mcus_after_idct[1][num_sub_mcus_horiz * vert_idx + horiz_idx]
+                y_idx = num_sub_mcus_vert * horiz_idx + vert_idx
+                y_mcu = decoded_mcu.mcus_after_idct[1][y_idx]
                 self.copy_to_full_image(sub_mcu_horiz_start_idx, sub_mcu_vert_start_idx, y_mcu, 0)
 
                 def fill_up_unsmeared(orig, horiz_start, vert_start):
