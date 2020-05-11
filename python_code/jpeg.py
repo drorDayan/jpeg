@@ -81,16 +81,19 @@ class Jpeg:
 
                 bytes_read, image, actual_width, actual_height = self.decode_raw_data(idx_in_file)
 
+                # TODO move this after debug to after the while loop
                 bmp_writer = BmpWriter()
                 bmp_writer.write_from_rgb(image, width=actual_width, height=actual_height)
                 idx_in_file += bytes_read
                 image_matrix = image
                 info_print("Picture decoded!")
+
         info_print("Parsing completed!")
         info_print("Beginning BMP creation!")
         if image_matrix is None or actual_height is None or actual_width is None:
             raise Exception("Error in retrieving image data")
     #    bmp_writer = BmpWriter()
+        assert self._exists_eoi
     #    bmp_writer.write_from_rgb(image_matrix, width=actual_width, height=actual_height)
         info_print("Finished creating BMP!")
 
