@@ -51,14 +51,14 @@ class JpegBitReader:
         res_bits = self.get_bits_as_bool_list(num_bits)
         return sum([2**(len(res_bits) - 1 - i) for i in range(len(res_bits)) if res_bits[i]])
 
-    def align(self):
+    def align(self, is_continue_reading):
         read_curr = self._bit_idx != 0
         read_next = self._last_byte_is_FF
         if read_curr:
             res = self.get_bits_as_bool_list(self.BYTE_SIZE - self._bit_idx)
             if not all(res):
                 raise Exception("Alignment before marker is wrong.")
-        elif read_next:
+        elif read_next and is_continue_reading:
             res = self.get_bits_as_bool_list(self.BYTE_SIZE)
             if any(res):
                 raise Exception("Alignment before marker is wrong.")

@@ -77,7 +77,7 @@ class RawDataDecoder:
     @staticmethod
     def handle_restart_interval(bit_reader, rst_idx):
         # We expect RSTm
-        bit_reader.align()
+        bit_reader.align(True)
         marker_mark = bit_reader.read_bits_as_int(JpegBitReader.BYTE_SIZE)
         if marker_mark != 0xFF:
             raise Exception("Expected RST marker during data scan, no marker appears")
@@ -109,7 +109,7 @@ class RawDataDecoder:
                                                                comp.dc_huffman_table, prev_dc_value, comp_id)
                     parsed_mcu.add_mcu(comp_id, decoded_mcu)
             self._decoded_mcu_list.append(parsed_mcu)
-        bit_reader.align()
+        bit_reader.align(False)
 
     def de_quantize(self, components):
         info_print("Beginning De-quantization")
