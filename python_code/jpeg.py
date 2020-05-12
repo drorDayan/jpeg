@@ -11,6 +11,8 @@ from marker_parsers.sof0_parser import Sof0Parser
 from marker_parsers.sos_parser import SosParser
 
 
+# TODO kill if unknown section -- see picture JPEI6055.JPG for example
+
 class Jpeg:
     def __init__(self, jpeg_file_path):
         self._ac_huffman_tables = {}
@@ -46,7 +48,7 @@ class Jpeg:
         DRI
         APPn, n>=1
         '''
-        self._markers_to_skip = {i for i in range(0xe1, 0xef + 1)} | {0xe0}
+        self._markers_to_skip = {i for i in range(0xe0, 0xef + 1)} | {0xfe}
 
     def parse(self):
         info_print("Started parsing!")
@@ -92,9 +94,9 @@ class Jpeg:
         info_print("Beginning BMP creation!")
         if image_matrix is None or actual_height is None or actual_width is None:
             raise Exception("Error in retrieving image data")
-    #    bmp_writer = BmpWriter()
+        #    bmp_writer = BmpWriter()
         assert self._exists_eoi
-    #    bmp_writer.write_from_rgb(image_matrix, width=actual_width, height=actual_height)
+        #    bmp_writer.write_from_rgb(image_matrix, width=actual_width, height=actual_height)
         info_print("Finished creating BMP!")
 
     def decode_raw_data(self, start_idx):
@@ -191,7 +193,7 @@ class Jpeg:
         assert max_horizontal_sample_factor % min_horizontal_sample_factor == 0
         assert max_vertical_sample_factor % min_vertical_sample_factor == 0
 
-        assert min_horizontal_sample_factor == 1 and min_vertical_sample_factor == 1,\
+        assert min_horizontal_sample_factor == 1 and min_vertical_sample_factor == 1, \
             "Learn about min sampling factors...."
         horiz_pixels_in_mcu = 8 * max_horizontal_sample_factor // min_horizontal_sample_factor
         vert_pixels_in_mcu = 8 * max_vertical_sample_factor // min_vertical_sample_factor
@@ -205,4 +207,3 @@ class Jpeg:
 
         # for comp in components_to_metadata.items(): #TODO do it better
         #     debug_print("comp num ", comp[0], "has the following data", comp[1])
-

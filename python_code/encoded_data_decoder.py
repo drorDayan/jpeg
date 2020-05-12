@@ -251,6 +251,8 @@ class RawDataDecoder:
                 put_value_in_matrix_zigzag(decoded_component_data, ac_value, decoded_idx)
                 decoded_idx += 1
 
+    #TODO add in the place where we huffman-decode that we do not get out of the input range
+    #TODO Handle EOB in DC value!!!
     def decode_component_in_mcu(self, bit_reader, ac_huffman, dc_huffman, prev_dc_value, comp_id):
         decoded_component_data = np.zeros((8, 8))
 
@@ -273,16 +275,25 @@ class RawDataDecoder:
         #        new_mat = [ for x in self._full_image_ycbcr]
         info_print("Beginning YCbCr -> RGB transformation")
 
+        #TODO fix this
         def inner_ycbcr_to_rgb(x):
             y = x + 128
-            for i in range(y.shape[0]):
-                if not -0.001 <= y[i] <= 255.001:
-                    print(f"OH noooo!! {y[i]}")
-            y_tag = y
-            y_tag[1] -= 128
-            y_tag[2] -= 128
+            # for i in range(y.shape[0]):
+            #     if not -0.001 <= y[i] <= 255.001:
+            #         print(f"OH noooo!! {y[i]}")
+            y_tag = y  #########
+            # y_tag[1] -= 128
+            # y_tag[2] -= 128
             r = np.matmul(transformation_matrix, y_tag)
+
+            R = math.floor(y[0] + 1.402 * (1.0 *y[2]  - 128.0))
+
+            G = math.floor(y[0] - 0.344136 * (1.0 * y[1] - 128.0) - 0.714136 * (1.0 * y[2] - 128.0))
+
+            B = math.floor(y[0] + 1.772 * (1.0 * y[1] - 128.0))
+
             # r = np.matmul(transformation_matrix, x) + 128
+            return R,G,B
             return round(r[0, 0]), round(r[0, 1]), round(r[0, 2])
 
         self._full_image_rgb = np.apply_along_axis(inner_ycbcr_to_rgb, 2, self._full_image_ycbcr)

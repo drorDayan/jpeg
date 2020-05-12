@@ -91,7 +91,12 @@ class BmpWriter:
                 for comp in range(3):
                     try:
                         comp_to_write = 2-comp # This is in order to print GBR and not RGB
-                        to_write.append(int(rgb_mat[row_idx, col_idx, comp_to_write]))
+                        value = rgb_mat[row_idx, col_idx, comp_to_write]
+                        if value > 255:
+                            value = 255
+                        if value < 0:
+                            value = 0
+                        to_write.append(int(value))
                     except Exception as e:
                         print(f"BADD in {row_idx, col_idx, comp_to_write}: {rgb_mat[row_idx, col_idx, comp_to_write]}")
                         print(e)

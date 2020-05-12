@@ -41,6 +41,8 @@ class JpegBitReader:
                         if self._bytes[self._byte_idx] == 0:
                             # debug_print("FF00 Happened!")
                             self._byte_idx += 1
+                        else:
+                            assert  0xd0 <= self._bytes[self._byte_idx] <= 0xd7
                         self._last_byte_is_FF = False
                         if self._bytes[self._byte_idx] == 0xFF:
                             self._last_byte_is_FF = True
