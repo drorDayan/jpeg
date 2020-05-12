@@ -83,7 +83,7 @@ class BmpWriter:
         to_write = bytearray()
         mmin, mmax = numpy.amin(rgb_mat), numpy.amax(rgb_mat)
         print(mmin, mmax)
-        rgb_mat = (rgb_mat - mmin) * (255/(mmax-mmin))
+       # rgb_mat = (rgb_mat - mmin) * (255/(mmax-mmin))
         for i in range(height):
             row_idx = height - 1 - i
             debug_print(f"Pringing row {row_idx} to BMP")

@@ -160,8 +160,11 @@ class RawDataDecoder:
 
         self.huffman_decode_mcus(bit_reader, self.jpeg_decode_metadata.components_to_metadata, n_mcu_horiz, n_mcu_vert,
                                  self.jpeg_decode_metadata.restart_interval)
+        print("time:", time.time())
 
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
+        print("time:", time.time())
+
         self.inverse_dct(self.jpeg_decode_metadata.components_to_metadata.keys())
 
         self.construct_pixel_map(n_mcu_horiz, pixels_mcu_horiz, pixels_mcu_vert)
@@ -181,10 +184,10 @@ class RawDataDecoder:
         #             debug_print(f"h={h}, r={r}, comp={i} val={self._full_image_rgb[r,h][i]}")
         # debug_print("DONE Faulty values")
 
-        debug_print("YCbCr")
-        for i in range(3):
-            np.savetxt(f"ycbcr_{i}.txt", self._full_image_ycbcr[:, :, i])
-        debug_print("YCbCr")
+        # debug_print("YCbCr")
+        # for i in range(3):
+        #     np.savetxt(f"ycbcr_{i}.txt", self._full_image_ycbcr[:, :, i])
+        # debug_print("YCbCr")
 
         return bit_reader.get_byte_location(), self._full_image_rgb, n_mcu_horiz * pixels_mcu_horiz, n_mcu_vert * pixels_mcu_vert
 

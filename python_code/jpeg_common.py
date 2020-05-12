@@ -7,6 +7,14 @@ CR_COMP_ID = 3
 Y_INDEX_IN_YCBCR = 0
 CB_INDEX_IN_YCBCR = 1
 CR_INDEX_IN_YCBCR = 2
+import time
+
+def time_me(f, x):
+    b = time.time()
+    y = f(x)
+    e = time.time()
+    print(e-b)
+    return y
 
 
 def debug_print(*arg, newline=True):
