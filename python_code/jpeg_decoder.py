@@ -166,7 +166,7 @@ class JpegDecoder:
             #     k=[i for i in range(min_len) if res[i] != bit_reader._bytes[i]]
             #     print(bit_reader._bytes[k[0]])
             #     print(res[k[0]])
-            sys.exit(0)
+            # sys.exit(0)
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
         print("time:", time.time())
 
