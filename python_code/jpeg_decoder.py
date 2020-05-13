@@ -1,5 +1,6 @@
 import itertools
 import math
+import sys
 
 import numpy as np
 import scipy as scipy
@@ -7,13 +8,14 @@ import time
 from bmp_writer import BmpWriter
 from jpeg_bit_reader import JpegBitReader
 from jpeg_common import *
+from jpeg_encoder import JpegEncoder
 
 Cred = 0.299
 Cgreen = 0.587
 Cblue = 0.114
 
 
-
+ENCODING_TEST = True
 
 # This is table 5 from https://www.impulseadventure.com/photo/jpeg-huffman-coding.html. It is used for value encoding.
 # It is const and does not appear anywhere in the JPG file.
@@ -119,12 +121,6 @@ class JpegDecoder:
             for comp_id in component_keys:
                 for comp_mcu in decoded_mcu.dequantized_mcus[comp_id]:
                     after_idct = scipy.fft.idct(scipy.fft.idct(comp_mcu.T, norm='ortho').T, norm='ortho')
-                    # if comp_id == 1:
-                    #     debug_print(after_idct)
-                    # TODO remove me
-                    # for i,j in itertools.product(range(after_idct.shape[0]), range(after_idct.shape[1])):
-                    #     if after_idct[i,j] <0:
-                    #         print(f"")
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
         info_print("Finished IDCT")
 
@@ -151,7 +147,18 @@ class JpegDecoder:
         self.huffman_decode_mcus(bit_reader, self.jpeg_decode_metadata.components_to_metadata, n_mcu_horiz, n_mcu_vert,
                                  self.jpeg_decode_metadata.restart_interval)
         print("time:", time.time())
-
+        if ENCODING_TEST:
+            encoder = JpegEncoder(self.jpeg_decode_metadata)
+            res = encoder.encode(self._decoded_mcu_list)
+            for x in res:
+                print(hex(x), end=" ")
+            print(' ')
+            for x in bit_reader._bytes:
+                print(hex(x), end=" ")
+            print(' ')
+            min_len = min(len(res), len(bit_reader._bytes))
+            print(f"Equal? {'Yes' if res[:min_len] == bit_reader._bytes[:min_len] else 'No'}")
+            sys.exit(0)
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
         print("time:", time.time())
 

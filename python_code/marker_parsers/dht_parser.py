@@ -28,7 +28,7 @@ class DhtParser(IParser):
             symbols_part = raw_marker[idx: idx + symbols_part_length]
             huff_tree = self.generate_huff_tree(symbols_of_length, symbols_part)
             huff_table = HuffTable(table_num, is_dc, huff_tree)
-            print(huff_table.get_lookup_table())
+     #       print(huff_table.get_lookup_table())
             jpg.add_huffman_table(huff_table)
             idx += symbols_part_length
 

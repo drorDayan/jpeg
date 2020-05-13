@@ -26,3 +26,9 @@ class JpegBitWriter:
     def flush(self):
         while self._bit_idx != 0:
             self.write_bit(1)
+
+    def write_byte(self, byte_to_write):
+        bits_to_write = [(byte_to_write & (1 << 7-i)) >> (7-i) for i in range(8)]
+        self.write_bits(bits_to_write)
+    def poop_all(self):
+        return self._data

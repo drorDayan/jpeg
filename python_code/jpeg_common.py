@@ -1,3 +1,5 @@
+import numpy as np
+
 level = "debug"
 number_of_components = 3
 Y_COMP_ID = 1
