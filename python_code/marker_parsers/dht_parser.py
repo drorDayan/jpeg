@@ -1,50 +1,8 @@
 from jpeg_common import *
 from marker_parsers.i_parser import IParser
+from huff import *
 
-
-class HuffTree:
-    def __init__(self, value=None):
-        self._value = value
-        self._successors = {}
-
-    def create_empty_kids(self):
-        assert (len(self._successors) == 0)
-        left = HuffTree()
-        right = HuffTree()
-        self._successors = {0: left, 1: right}
-
-    def get_kid(self, which):
-        return self._successors[which]
-
-    def get_kids(self):
-        return self._successors.values()
-
-    def set_value(self, value):
-        self._value = value
-
-    def get_value(self):
-        return self._value
-
-    def is_leaf(self):
-        return len(self._successors) == 0
-
-
-class HuffTable:
-    def __init__(self, table_num, is_dc, tree):
-        self._table_num = table_num
-        self._is_dc = is_dc
-        self._tree = tree
-
-    def get_is_dc(self):
-        return self._is_dc
-
-    def get_table_id(self):
-        return self._table_num
-
-    def get_tree(self):
-        return self._tree
-
-
+git 
 class DhtParser(IParser):
     max_symbol_length = 16
     max_num_symbols = 256
@@ -70,6 +28,7 @@ class DhtParser(IParser):
             symbols_part = raw_marker[idx: idx + symbols_part_length]
             huff_tree = self.generate_huff_tree(symbols_of_length, symbols_part)
             huff_table = HuffTable(table_num, is_dc, huff_tree)
+            print(huff_table.get_lookup_table())
             jpg.add_huffman_table(huff_table)
             idx += symbols_part_length
 
