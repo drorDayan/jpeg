@@ -14,8 +14,8 @@ Cred = 0.299
 Cgreen = 0.587
 Cblue = 0.114
 
-
 ENCODING_TEST = True
+
 
 # This is table 5 from https://www.impulseadventure.com/photo/jpeg-huffman-coding.html. It is used for value encoding.
 # It is const and does not appear anywhere in the JPG file.
@@ -23,11 +23,13 @@ def value_encoding(dc_code: int, additional_bits: int):
     if dc_code == 0:
         return 0
     dc_value_sign = 1 if ((additional_bits & (1 << (dc_code - 1))) > 0) else -1
+    if dc_value_sign == 1:
+        return additional_bits
+
     additional_bits_to_add = additional_bits & ((1 << (dc_code - 1)) - 1)
 
-    dc_value_base = (2 ** (dc_code - 1)) if dc_value_sign > 0 else (-1 * ((2 ** dc_code) - 1))
+    dc_value_base = 1 - (1 << dc_code)
     ret_val = dc_value_base + additional_bits_to_add
-    assert (dc_value_sign == -1 or additional_bits == ret_val)  # TODO do something with it!
     return ret_val
 
 
@@ -150,14 +152,20 @@ class JpegDecoder:
         if ENCODING_TEST:
             encoder = JpegEncoder(self.jpeg_decode_metadata)
             res = encoder.encode(self._decoded_mcu_list)
-            for x in res:
-                print(hex(x), end=" ")
-            print(' ')
-            for x in bit_reader._bytes:
-                print(hex(x), end=" ")
-            print(' ')
+
+            # for x in res:
+            #     print(hex(x), end=" ")
+            # print(' ')
+            # for x in bit_reader._bytes:
+            #     print(hex(x), end=" ")
+            # print(' ')
             min_len = min(len(res), len(bit_reader._bytes))
-            print(f"Equal? {'Yes' if res[:min_len] == bit_reader._bytes[:min_len] else 'No'}")
+            eqeq = res[:min_len] == bit_reader._bytes[:min_len]
+            print(f"Equal? {'Yes' if eqeq else 'No'}")
+            # if not eqeq:
+            #     k=[i for i in range(min_len) if res[i] != bit_reader._bytes[i]]
+            #     print(bit_reader._bytes[k[0]])
+            #     print(res[k[0]])
             sys.exit(0)
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
         print("time:", time.time())

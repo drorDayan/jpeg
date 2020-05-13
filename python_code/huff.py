@@ -39,6 +39,7 @@ class HuffTable:
         self._table_num = table_num
         self._is_dc = is_dc
         self._tree = tree
+        self._lookup_table = None
 
     def get_is_dc(self):
         return self._is_dc
@@ -50,5 +51,12 @@ class HuffTable:
         return self._tree
 
     def get_lookup_table(self):
-        curr_decoded_val = []
-        return self._tree.get_lookup_table(curr_decoded_val)
+        if self._lookup_table is None:
+            curr_decoded_val = []
+            self._lookup_table = self._tree.get_lookup_table(curr_decoded_val)
+        return self._lookup_table
+
+    #drorda
+    # FAST_POW (
+    #     some things i learned in numerica and i do..
+    # )
