@@ -63,7 +63,7 @@ class UnsmearedMcu:
         self.color_components = color_components
 
 
-class RawDataDecoder:
+class JpegDecoder:
     def __init__(self, raw_data, jpeg_decode_metadata):
         self.raw_data = raw_data
         self.jpeg_decode_metadata = jpeg_decode_metadata
@@ -169,25 +169,7 @@ class RawDataDecoder:
 
         self.construct_pixel_map(n_mcu_horiz, pixels_mcu_horiz, pixels_mcu_vert)
 
-        # debug_print("YCbCr Matrices:")
-        #
-        # print_mat_by_components(self._full_image_ycbcr)
-
         self._to_rgb()
-        # debug_print("RGB Matrices:")
-        #
-        # print_mat_by_components(self._full_image_rgb)
-        # debug_print("Faulty values:")
-        # for i in range(3):
-        #     for r , h in itertools.product(range(16), range(16)):
-        #         if not 0 <= self._full_image_rgb[r,h][i] <= 255:
-        #             debug_print(f"h={h}, r={r}, comp={i} val={self._full_image_rgb[r,h][i]}")
-        # debug_print("DONE Faulty values")
-
-        # debug_print("YCbCr")
-        # for i in range(3):
-        #     np.savetxt(f"ycbcr_{i}.txt", self._full_image_ycbcr[:, :, i])
-        # debug_print("YCbCr")
 
         return bit_reader.get_byte_location(), self._full_image_rgb, n_mcu_horiz * pixels_mcu_horiz, n_mcu_vert * pixels_mcu_vert
 
@@ -254,8 +236,8 @@ class RawDataDecoder:
                 put_value_in_matrix_zigzag(decoded_component_data, ac_value, decoded_idx)
                 decoded_idx += 1
 
-    #TODO add in the place where we huffman-decode that we do not get out of the input range
-    #TODO Handle EOB in DC value!!!
+    # TODO add in the place where we huffman-decode that we do not get out of the input range
+    # TODO Handle EOB in DC value!!!
     def decode_component_in_mcu(self, bit_reader, ac_huffman, dc_huffman, prev_dc_value, comp_id):
         decoded_component_data = np.zeros((8, 8))
 
@@ -278,7 +260,7 @@ class RawDataDecoder:
         #        new_mat = [ for x in self._full_image_ycbcr]
         info_print("Beginning YCbCr -> RGB transformation")
 
-        #TODO fix this
+        # TODO fix this
         def inner_ycbcr_to_rgb(x):
             y = x + 128
             # for i in range(y.shape[0]):
@@ -289,15 +271,14 @@ class RawDataDecoder:
             # y_tag[2] -= 128
             r = np.matmul(transformation_matrix, y_tag)
 
-            R = math.floor(y[0] + 1.402 * (1.0 *y[2]  - 128.0))
+            R = math.floor(y[0] + 1.402 * (1.0 * y[2] - 128.0))
 
             G = math.floor(y[0] - 0.344136 * (1.0 * y[1] - 128.0) - 0.714136 * (1.0 * y[2] - 128.0))
 
             B = math.floor(y[0] + 1.772 * (1.0 * y[1] - 128.0))
 
             # r = np.matmul(transformation_matrix, x) + 128
-            return R,G,B
-            return round(r[0, 0]), round(r[0, 1]), round(r[0, 2])
+            return R, G, B
 
         self._full_image_rgb = np.apply_along_axis(inner_ycbcr_to_rgb, 2, self._full_image_ycbcr)
 
@@ -306,7 +287,8 @@ class RawDataDecoder:
     def copy_to_full_image(self, start_row_idx_dst, start_col_idx_dst, dst, comp):
         assert dst.shape[0] + start_row_idx_dst <= self._full_image_ycbcr.shape[0] and \
                dst.shape[1] + start_col_idx_dst <= self._full_image_ycbcr.shape[1] and 0 <= comp <= 2
-        self._full_image_ycbcr[start_row_idx_dst: start_row_idx_dst+dst.shape[0], start_col_idx_dst:start_col_idx_dst + dst.shape[1], comp] = dst
+        self._full_image_ycbcr[start_row_idx_dst: start_row_idx_dst + dst.shape[0],
+        start_col_idx_dst:start_col_idx_dst + dst.shape[1], comp] = dst
         # for i, j in itertools.product(range(8), range(8)):
         #     self._full_image_ycbcr[start_row_idx_dst + i, start_col_idx_dst + j, comp] = dst[i, j]
 
@@ -325,8 +307,8 @@ class RawDataDecoder:
             mcu_col_idx = (decoded_mcu_idx % n_mcu_horiz)
 
             def smear(orig):
-                mat = np.zeros((8*num_sub_mcus_in_col, 8*num_sub_mcus_in_row))
-                for r, c in itertools.product(range(8*num_sub_mcus_in_col), range(8*num_sub_mcus_in_row)):
+                mat = np.zeros((8 * num_sub_mcus_in_col, 8 * num_sub_mcus_in_row))
+                for r, c in itertools.product(range(8 * num_sub_mcus_in_col), range(8 * num_sub_mcus_in_row)):
                     orig_r_idx = r // num_sub_mcus_in_col
                     orig_c_idx = c // num_sub_mcus_in_row
                     mat[r, c] = orig[orig_r_idx, orig_c_idx]
@@ -334,18 +316,18 @@ class RawDataDecoder:
 
             cb_smeared = smear(decoded_mcu.mcus_after_idct[CB_COMP_ID][0])
             cr_smeared = smear(decoded_mcu.mcus_after_idct[CR_COMP_ID][0])
-            self.copy_to_full_image((mcu_row_idx * num_sub_mcus_in_col)*8, (mcu_col_idx * num_sub_mcus_in_row)*8,
+            self.copy_to_full_image((mcu_row_idx * num_sub_mcus_in_col) * 8, (mcu_col_idx * num_sub_mcus_in_row) * 8,
                                     cb_smeared, CB_INDEX_IN_YCBCR)
-            self.copy_to_full_image((mcu_row_idx * num_sub_mcus_in_col)*8, (mcu_col_idx * num_sub_mcus_in_row)*8,
+            self.copy_to_full_image((mcu_row_idx * num_sub_mcus_in_col) * 8, (mcu_col_idx * num_sub_mcus_in_row) * 8,
                                     cr_smeared, CR_INDEX_IN_YCBCR)
             # A sub_mcu is a 8X8 pixel matrix
             for sub_mcu_col_idx, sub_mcu_row_idx in \
                     itertools.product(range(num_sub_mcus_in_row), range(num_sub_mcus_in_col)):
-
-                y_mcu_idx = sub_mcu_row_idx*num_sub_mcus_in_row + sub_mcu_col_idx
+                y_mcu_idx = sub_mcu_row_idx * num_sub_mcus_in_row + sub_mcu_col_idx
                 y_mcu = decoded_mcu.mcus_after_idct[Y_COMP_ID][y_mcu_idx]
-                self.copy_to_full_image((mcu_row_idx*num_sub_mcus_in_col+sub_mcu_row_idx) * 8,
-                                        (mcu_col_idx * num_sub_mcus_in_row + sub_mcu_col_idx) * 8, y_mcu, Y_INDEX_IN_YCBCR)
+                self.copy_to_full_image((mcu_row_idx * num_sub_mcus_in_col + sub_mcu_row_idx) * 8,
+                                        (mcu_col_idx * num_sub_mcus_in_row + sub_mcu_col_idx) * 8, y_mcu,
+                                        Y_INDEX_IN_YCBCR)
 
         info_print("Done constructing pixel map")
 

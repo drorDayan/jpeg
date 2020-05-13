@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from bmp_writer import BmpWriter
-from encoded_data_decoder import RawDataDecoder
+from jpeg_decoder import JpegDecoder
 from jpeg_common import *
 from marker_parsers.dht_parser import DhtParser, HuffTable
 from marker_parsers.dqt_parser import DqtParser
@@ -100,7 +100,7 @@ class Jpeg:
         info_print("Finished creating BMP!")
 
     def decode_raw_data(self, start_idx):
-        decoder = RawDataDecoder(self._jpg_data[start_idx:], self.jpeg_decode_metadata)
+        decoder = JpegDecoder(self._jpg_data[start_idx:], self.jpeg_decode_metadata)
         new_idx, image, actual_width, actual_height = decoder.decode()
         return new_idx, image, actual_width, actual_height
 
