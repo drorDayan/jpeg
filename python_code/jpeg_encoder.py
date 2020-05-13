@@ -21,18 +21,15 @@ class JpegEncoder:
 
     def huffman_code(self, comp_id, is_dc, value):
         huff_table = self.metadata.components_to_metadata[comp_id].dc_huffman_table if is_dc else \
-        self.metadata.components_to_metadata[comp_id].ac_huffman_table
+           self.metadata.components_to_metadata[comp_id].ac_huffman_table
         huff_lookup = huff_table.get_lookup_table()
         bits_to_write = huff_lookup[value]
         return bits_to_write
 
     @staticmethod
     def get_bits_from_number(value, num_bits):
-        bits_to_ret = []
-        for i in range(num_bits):
-            bits_to_ret = [(value % 2)] + bits_to_ret
-            value //= 2
-        return bits_to_ret
+        return [((value & (1 << i)) >> i) for i in range(num_bits - 1, -1, -1)]
+
 
     def table_5_encoding(self, value_to_encode):
         code = math.ceil(math.log2(math.fabs(value_to_encode) + 1))
@@ -111,6 +108,8 @@ class JpegEncoder:
         rst_idx = 0
         for datum_idx in range(len(data)):
             # datum is McuParsedDctComponents
+            if datum_idx % 1000 == 0:
+                print(datum_idx)
             if self.metadata.restart_interval is not None and datum_idx > 0 and datum_idx % self.metadata.restart_interval == 0:
                 self.emit_rst_marker(jpeg_bit_writer, rst_idx)
                 rst_idx = (rst_idx + 1) % 8
@@ -120,10 +119,12 @@ class JpegEncoder:
             mcu = McuToEncode(datum.raw_mcus)
             self.huffman_encode_mcu(mcu, jpeg_bit_writer, dc_prev_values)
 
+        print(f"Restart interval: {self.metadata.restart_interval}")
         jpeg_bit_writer.flush()
         return jpeg_bit_writer.poop_all()
 
     @staticmethod
     def emit_rst_marker(jpeg_bit_writer, rst_idx):
+        jpeg_bit_writer.flush()
         jpeg_bit_writer.write_byte(0xff)
         jpeg_bit_writer.write_byte(0xd0 + rst_idx)

@@ -2,7 +2,7 @@ from jpeg_common import *
 
 
 def bit_getter(i):
-    return lambda byte: ((byte & (1 << (7-i))) > 0)
+    return lambda byte: ((byte & (1 << (7 - i))) > 0)
 
 
 class JpegBitReader:
@@ -12,6 +12,7 @@ class JpegBitReader:
     def __init__(self, src_bytes):
         assert (len(src_bytes) > 0)
         self._bytes = src_bytes
+        self._input_len = len(self._bytes)
         self._byte_idx = 0
         self._bit_idx = 0
         self._last_byte_is_FF = src_bytes[0] == 0xFF
@@ -20,7 +21,7 @@ class JpegBitReader:
         return self._byte_idx if self._bit_idx == 0 else self._byte_idx + 1
 
     def at_end(self):
-        return self._byte_idx >= len(self._bytes)
+        return self._byte_idx >= self._input_len
 
     def get_bits_as_bool_list(self, num_bits_to_read):
         bits_to_return = []
@@ -42,21 +43,19 @@ class JpegBitReader:
                             # debug_print("FF00 Happened!")
                             self._byte_idx += 1
                         else:
-                            assert  0xd0 <= self._bytes[self._byte_idx] <= 0xd7
-                        self._last_byte_is_FF = False
-                        if self._bytes[self._byte_idx] == 0xFF:
-                            self._last_byte_is_FF = True
+                            assert 0xd0 <= self._bytes[self._byte_idx] <= 0xd7
+                        self._last_byte_is_FF = self._bytes[self._byte_idx] == 0xFF
 
         return bits_to_return
 
     def read_bits_as_int(self, num_bits):
         res_bits = self.get_bits_as_bool_list(num_bits)
-        return sum([2**(len(res_bits) - 1 - i) for i in range(len(res_bits)) if res_bits[i]])
+        return sum([2 ** (len(res_bits) - 1 - i) for i in range(len(res_bits)) if res_bits[i]])
 
     # TODO I think it's true. if there are bugs here reconsider.
     def align(self, is_continue_reading):
         read_curr = self._bit_idx != 0
-        #read_next = self._last_byte_is_FF
+        # read_next = self._last_byte_is_FF
         if read_curr:
             res = self.get_bits_as_bool_list(self.BYTE_SIZE - self._bit_idx)
             if not all(res):
