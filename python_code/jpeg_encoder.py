@@ -1,56 +1,112 @@
 import math
 
 from jpeg_bit_writer import JpegBitWriter
+from jpeg_common import zig_zag_index
 
 
 class JpegEncoder:
     def __init__(self, metadata):
         self.metadata = metadata
 
-        class McuToEncode:
-            def __init__(self, sub_mcus):
-                self._sub_mcus = sub_mcus
+    class McuToEncode:
+        def __init__(self, sub_mcus):
+            self._sub_mcus = sub_mcus
 
-            def get_component_ids(self):
-                return self._sub_mcus.keys()
+        def get_component_ids(self):
+            return self._sub_mcus.keys()
 
-            def get_mcus_by_components(self, comp_id):
-                return self._sub_mcus[comp_id]
+        def get_mcus_by_components(self, comp_id):
+            return self._sub_mcus[comp_id]
 
+    def huffman_code(self, comp_id, is_dc, value):
+        huff_tables = self.metadata.dc_huffman_tables if is_dc else self.metadata.ac_huffman_tables
+        huff_table = huff_tables[comp_id]
+        huff_lookup = huff_table.get_lookup_table()
+        bits_to_write = huff_lookup[value]
+        return bits_to_write
 
-        def encode_dc_value(self, dc_value, dc_prev_values, comp_id):
-            diff_dc_value = dc_value - dc_prev_values[comp_id]
+    @staticmethod
+    def get_bits_from_number(value, num_bits):
+        bits_to_ret = []
+        for i in range(num_bits):
+            bits_to_ret = [(value % 2)] + bits_to_ret
+            value /= 2
+        return bits_to_ret
 
-            dc_code = math.ceil(math.log2(math.fabs(diff_dc_value) + 1))
+    def table_5_encoding(self, value_to_encode):
+        code = math.ceil(math.log2(math.fabs(value_to_encode) + 1))
 
-            additional_bits = []
-            if diff_dc_value > 0:
-                return 9
-            elif diff_dc_value < 0:
-                return 8
+        if value_to_encode == 0:
+            return code, []
 
+        if value_to_encode > 0:
+            additional_bits_value = value_to_encode
+        else:
+            base_value = 1 - 2 ** code
+            additional_bits_value = value_to_encode - base_value
 
+        additional_bits = self.get_bits_from_number(additional_bits_value, code)
 
-        def encode_sub_mcu(self, sub_mcu, jpeg_bit_writer, dc_prev_values, comp_id):
-            dc_value = sub_mcu[0,0]
-            self.encode_dc_value(dc_value, dc_prev_values, comp_id)
+        return code, additional_bits
 
-        def huffman_encode_mcu(self, mcu_to_encode : McuToEncode, jpeg_bit_writer):
-            dc_prev_values = {comp_id : 0 for comp_id in mcu_to_encode.get_component_ids()}
-            for comp_id in mcu_to_encode.get_component_ids():
-                sub_mcu_list = mcu_to_encode.get_mcus_by_components(comp_id)
-                for sub_mcu in sub_mcu_list:
-                    self.encode_sub_mcu(sub_mcu, jpeg_bit_writer, dc_prev_values, comp_id)
+    def encode_dc_value(self, dc_value, dc_prev_values, comp_id, jpeg_bit_writer):
+        diff_dc_value = dc_value - dc_prev_values[comp_id]
 
+        dc_code, additional_bits = self.table_5_encoding(diff_dc_value)
 
-        def encode(self, data):
-            jpeg_bit_writer = JpegBitWriter()
+        dc_code_bits = self.huffman_code(comp_id, True, dc_code)
+        jpeg_bit_writer.write_bits(dc_code_bits)
+        jpeg_bit_writer.write_bits(additional_bits)
 
-            # data is now a collection of mcus
-            for datum in data:
-                self.huffman_encode_mcu(datum, jpeg_bit_writer)
+    def encode_ac_values(self, sub_mcu, jpeg_bit_writer, ac_huff_table, comp_id):
 
+        encoded_idx = 1
+        while encoded_idx < 64:
+            zero_count = 0
+            while encoded_idx < 64:
+                x, y = zig_zag_index(encoded_idx)
+                if sub_mcu[x, y] == 0:
+                    zero_count += 1
+                    encoded_idx += 1
+                else:
+                    break
 
+            if encoded_idx == 64:
+                eob_bits = self.huffman_code(comp_id, False, 0)
+                jpeg_bit_writer.write_bits(eob_bits)
+                return
 
+            while zero_count >= 16:
+                zrl_bits = self.huffman_code(comp_id, False, 0xF0)
+                jpeg_bit_writer.write_bits(zrl_bits)
+                zero_count -= 16
 
+            ac_value = sub_mcu[zig_zag_index(encoded_idx)]
+
+            ac_code_size, additional_bits = self.table_5_encoding(ac_value)
+            rle_and_size_byte = zero_count << 4 + ac_code_size
+            ac_code_bits = self.huffman_code(comp_id, False, rle_and_size_byte)
+            jpeg_bit_writer.write_bits(ac_code_bits)
+            jpeg_bit_writer.write_bits(additional_bits)
+
+            encoded_idx += 1
+
+    def encode_sub_mcu(self, sub_mcu, jpeg_bit_writer, dc_prev_values, comp_id):
+        dc_value = sub_mcu[0, 0]
+        self.encode_dc_value(dc_value, dc_prev_values, comp_id, jpeg_bit_writer)
+        self.encode_ac_values(sub_mcu, jpeg_bit_writer, comp_id)
+        
+    def huffman_encode_mcu(self, mcu_to_encode: McuToEncode, jpeg_bit_writer):
+        dc_prev_values = {comp_id: 0 for comp_id in mcu_to_encode.get_component_ids()}
+        for comp_id in mcu_to_encode.get_component_ids():
+            sub_mcu_list = mcu_to_encode.get_mcus_by_components(comp_id)
+            for sub_mcu in sub_mcu_list:
+                self.encode_sub_mcu(sub_mcu, jpeg_bit_writer, dc_prev_values, comp_id)
+
+    def encode(self, data):
+        jpeg_bit_writer = JpegBitWriter()
+
+        # data is now a collection of mcus
+        for datum in data:
+            self.huffman_encode_mcu(datum, jpeg_bit_writer)
 

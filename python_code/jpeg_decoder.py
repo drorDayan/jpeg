@@ -13,16 +13,6 @@ Cgreen = 0.587
 Cblue = 0.114
 
 
-# lookup table you ugly bugly
-def zig_zag_index(k, n=8):
-    # upper side of interval
-    if k >= n * (n + 1) // 2:
-        i, j = zig_zag_index(n * n - 1 - k, n)
-        return n - 1 - i, n - 1 - j
-    # lower side of interval
-    i = int((np.sqrt(1 + 8 * k) - 1) / 2)
-    j = k - i * (i + 1) // 2
-    return (j, i - j) if i & 1 else (i - j, j)
 
 
 # This is table 5 from https://www.impulseadventure.com/photo/jpeg-huffman-coding.html. It is used for value encoding.
