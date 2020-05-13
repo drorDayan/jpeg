@@ -10,3 +10,10 @@ if __name__ == '__main__':
     pic.parse()
     print("time:", time.time())
 
+    # data = open(r'..\imgs\lennag.JPG', "rb").read()
+    # for i in range(len(data)):
+    #     if data[i] == 0xff and data[i+1] == 0xc0:
+    #         print(data[i+9])
+    #         break
+
+
