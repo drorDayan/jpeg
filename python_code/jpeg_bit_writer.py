@@ -5,6 +5,6 @@ class JpegBitWriter:
         self._data_place = bytearray()
         self._byte_buffer = 0x00
 
-    def write_bit(self):
+    def write_bit(self, bits_to_write):
         pass
 
