@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 import scipy as scipy
-
+import time
 from bmp_writer import BmpWriter
 from jpeg_bit_reader import JpegBitReader
 from jpeg_common import *
