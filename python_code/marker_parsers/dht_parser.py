@@ -1,6 +1,6 @@
 from jpeg_common import *
 from marker_parsers.i_parser import IParser
-from huff import *
+from huffman import *
 
 
 class DhtParser(IParser):

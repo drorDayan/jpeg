@@ -1,7 +1,5 @@
-import numpy as np
+log_level = "info"
 
-level = "debug"
-# number_of_components = 3
 Y_COMP_ID = 1
 CB_COMP_ID = 2
 CR_COMP_ID = 3
@@ -25,17 +23,8 @@ def zig_zag_index(k):
     return ZIG_ZAG_LOOKUP[k]
 
 
-def zig_zag_value(i, j, n):
-    # upper side of interval
-    if i + j >= n:
-        return n * n - 1 - zig_zag_value(n - 1 - i, n - 1 - j, n)
-    # lower side of interval
-    k = (i + j) * (i + j + 1) // 2
-    return k + i if (i + j) & 1 else k + j
-
-
 def debug_print(*arg, newline=True):
-    if level == "debug":
+    if log_level == "debug":
         if newline:
             print(*arg)
         if not newline:
@@ -43,7 +32,7 @@ def debug_print(*arg, newline=True):
 
 
 def info_print(*arg, newline=True):
-    if level == "info" or level == "debug":
+    if log_level == "info" or log_level == "debug":
         if newline:
             print(*arg)
         if not newline:

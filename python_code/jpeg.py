@@ -11,8 +11,7 @@ from marker_parsers.sof0_parser import Sof0Parser
 from marker_parsers.sos_parser import SosParser
 
 
-# TODO kill if unknown section -- see picture JPEI6055.JPG for example
-
+# This class is a combination of a Jpeg metadata builder and the main jpeg decoding functionality (Fix in the real code)
 class Jpeg:
     def __init__(self, jpeg_file_path):
         self._ac_huffman_tables = {}
@@ -204,6 +203,3 @@ class Jpeg:
         self.jpeg_decode_metadata = Jpeg.JpegDecodeMetadata(self.restart_interval, horiz_pixels_in_mcu,
                                                             vert_pixels_in_mcu, self.height,
                                                             self.width, components_to_metadata)
-
-        # for comp in components_to_metadata.items(): #TODO do it better
-        #     debug_print("comp num ", comp[0], "has the following data", comp[1])

@@ -1,12 +1,11 @@
 from jpeg import Jpeg
 import time
 
-from jpeg_common import zig_zag_index
-
 if __name__ == '__main__':
 
     # img_path = r'..\imgs\lennag.JPG'
     img_path = r'..\imgs\lenna.JPG'
+    # img_path = r'..\imgs\FPEI6055.JPG'
     # # Print num of components for debug
     # data = open(img_path, "rb").read()
     # for i in range(len(data)):

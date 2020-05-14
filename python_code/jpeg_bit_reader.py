@@ -1,13 +1,10 @@
-from jpeg_common import *
 
-
-def bit_getter(i):
-    return lambda byte: ((byte & (1 << (7 - i))) > 0)
+def bit_getter(bit_idx, byte):
+    return (byte & (1 << (7 - bit_idx))) > 0
 
 
 class JpegBitReader:
     BYTE_SIZE = 8
-    bit_getters = {i: bit_getter(i) for i in range(BYTE_SIZE)}
 
     def __init__(self, src_bytes):
         assert (len(src_bytes) > 0)
@@ -27,7 +24,7 @@ class JpegBitReader:
         bits_to_return = []
 
         while len(bits_to_return) < num_bits_to_read and not self.at_end():
-            next_bit = self.bit_getters[self._bit_idx](self._bytes[self._byte_idx])
+            next_bit = bit_getter(self._bit_idx, self._bytes[self._byte_idx])
             bits_to_return.append(next_bit)
             self._bit_idx += 1
 
@@ -52,15 +49,9 @@ class JpegBitReader:
         res_bits = self.get_bits_as_bool_list(num_bits)
         return sum([2 ** (len(res_bits) - 1 - i) for i in range(len(res_bits)) if res_bits[i]])
 
-    # TODO I think it's true. if there are bugs here reconsider.
-    def align(self, is_continue_reading):
+    def align(self):
         read_curr = self._bit_idx != 0
-        # read_next = self._last_byte_is_FF
         if read_curr:
             res = self.get_bits_as_bool_list(self.BYTE_SIZE - self._bit_idx)
             if not all(res):
-                raise Exception("Alignment before marker is wrong.")
-        # elif read_next and is_continue_reading:
-        #     res = self.get_bits_as_bool_list(self.BYTE_SIZE)
-        #     if any(res):
-        #         raise Exception("Alignment before marker is wrong.")
+                raise Exception("Alignment is wrong.")

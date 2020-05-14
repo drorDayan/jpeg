@@ -28,7 +28,7 @@ class JpegEncoder:
 
     @staticmethod
     def get_bits_from_number(value, num_bits):
-        return [((value & (1 << i)) >> i) for i in range(num_bits - 1, -1, -1)]
+        return [((value & (1 << i)) >> i) for i in reversed(range(num_bits))]
 
     @staticmethod
     def table_5_encoding(value_to_encode):

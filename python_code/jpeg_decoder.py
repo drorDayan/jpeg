@@ -1,18 +1,12 @@
 import itertools
 import math
-import sys
 
 import numpy as np
 import scipy as scipy
 import time
-from bmp_writer import BmpWriter
 from jpeg_bit_reader import JpegBitReader
 from jpeg_common import *
 from jpeg_encoder import JpegEncoder
-
-Cred = 0.299
-Cgreen = 0.587
-Cblue = 0.114
 
 ENCODING_TEST = True
 
@@ -38,9 +32,6 @@ def put_value_in_matrix_zigzag(matrix, value, index):
     matrix[row, col] = value
 
 
-#   debug_print(f"MCU: putting {value} in ({row},{col})")
-
-
 class McuParsedDctComponents:
     def __init__(self, component_ids):
         self.raw_mcus = {i: [] for i in component_ids}
@@ -49,12 +40,6 @@ class McuParsedDctComponents:
 
     def add_mcu(self, comp_id, mcu):
         self.raw_mcus[comp_id].append(mcu)
-
-
-# DROR: you will not exist
-class UnsmearedMcu:
-    def __init__(self, color_components):
-        self.color_components = color_components
 
 
 class JpegDecoder:
@@ -71,7 +56,7 @@ class JpegDecoder:
     @staticmethod
     def handle_restart_interval(bit_reader, rst_idx):
         # We expect RSTm
-        bit_reader.align(True)
+        bit_reader.align()
         marker_mark = bit_reader.read_bits_as_int(JpegBitReader.BYTE_SIZE)
         if marker_mark != 0xFF:
             raise Exception("Expected RST marker during data scan, no marker appears")
@@ -103,7 +88,7 @@ class JpegDecoder:
                                                                comp.dc_huffman_table, prev_dc_value, comp_id)
                     parsed_mcu.add_mcu(comp_id, decoded_mcu)
             self._decoded_mcu_list.append(parsed_mcu)
-        bit_reader.align(False)
+        bit_reader.align()
 
     def de_quantize(self, components):
         info_print("Beginning De-quantization")
@@ -112,8 +97,6 @@ class JpegDecoder:
                 quantization_table = comp.quantization_table
                 for comp_mcu in decoded_mcu.raw_mcus[comp_id]:
                     de_quantized_mcu = np.multiply(quantization_table, comp_mcu)
-                    # if comp_id == 1:
-                    #     debug_print(de_quantized_mcu)
                     decoded_mcu.dequantized_mcus[comp_id].append(de_quantized_mcu)
         info_print("Finish De-quantization")
 
@@ -126,8 +109,8 @@ class JpegDecoder:
                     decoded_mcu.mcus_after_idct[comp_id].append(after_idct)
         info_print("Finished IDCT")
 
-    # TODO
-    # Understand 2D-DCT : https://stackoverflow.com/questions/15978468/using-the-scipy-dct-function-to-create-a-2d-dct-ii
+    # GAL
+    # Understand 2D-DCT :https://stackoverflow.com/questions/15978468/using-the-scipy-dct-function-to-create-a-2d-dct-ii
 
     # The jpeg MCUs are simply placed one after the other, therefore decoding them must be in order.
     # Here, each decoding step is done for every MCU, one by one.
@@ -148,33 +131,22 @@ class JpegDecoder:
 
         self.huffman_decode_mcus(bit_reader, self.jpeg_decode_metadata.components_to_metadata, n_mcu_horiz, n_mcu_vert,
                                  self.jpeg_decode_metadata.restart_interval)
-        print("time:", time.time())
+        info_print("time:", time.time())
         if ENCODING_TEST:
             encoder = JpegEncoder(self.jpeg_decode_metadata)
             res = encoder.encode(self._decoded_mcu_list)
 
-            # for x in res:
-            #     print(hex(x), end=" ")
-            # print(' ')
-            # for x in bit_reader._bytes:
-            #     print(hex(x), end=" ")
-            # print(' ')
             min_len = min(len(res), len(bit_reader._bytes))
-            eqeq = res[:min_len] == bit_reader._bytes[:min_len]
-            print(f"Equal? {'Yes' if eqeq else 'No'}")
-            # if not eqeq:
-            #     k=[i for i in range(min_len) if res[i] != bit_reader._bytes[i]]
-            #     print(bit_reader._bytes[k[0]])
-            #     print(res[k[0]])
-            # sys.exit(0)
+            is_eq = res[:min_len] == bit_reader._bytes[:min_len]
+            info_print(f"Equal? {'Yes ☺' if is_eq else 'No!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'}")
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
-        print("time:", time.time())
+        info_print("time:", time.time())
 
         self.inverse_dct(self.jpeg_decode_metadata.components_to_metadata.keys())
-        # TODO the code up until now is true regardless of the number of components,
-        #  from here and on it is color space dependent and needs to be fixed
+        # TODO: The code up until now is true regardless of the number of components,
+        #  from here and on it is color space dependent and needs to be fixed because the next function shouldn't be
         self.construct_pixel_map(n_mcu_horiz, pixels_mcu_horiz, pixels_mcu_vert)
-
+        # DROR From here it should be color space dependent
         self._to_rgb()
 
         return bit_reader.get_byte_location(), self._full_image_rgb, n_mcu_horiz * pixels_mcu_horiz, n_mcu_vert * pixels_mcu_vert
@@ -224,26 +196,24 @@ class JpegDecoder:
             #  debug_print(f"AC code = {ac_code}, which is ({run_length}, {size})")
             if run_length == 0 and size == 0:
                 # This is EOB. No more (we start with a zero matrix)
-                #   debug_print("EOB")
+                debug_print("EOB")
                 break
             elif run_length == 15 and size == 0:
                 # This is ZRL
-                #     debug_print("ZRL")
+                debug_print("ZRL")
                 decoded_idx += 16
                 continue
             else:
-                #    debug_print(f"Putting {run_length} zero AC values")
+                debug_print(f"Putting {run_length} zero AC values")
                 decoded_idx += run_length
                 value_aux = bit_reader.read_bits_as_int(size)
-                #   debug_print(f"additional bits = {value_aux}")
 
                 ac_value = value_encoding(size, value_aux)  # This is again table 5!!
-                #   debug_print(f"AC value = {ac_value}")
+                # debug_print(f"AC value = {ac_value}")
                 put_value_in_matrix_zigzag(decoded_component_data, ac_value, decoded_idx)
                 decoded_idx += 1
 
-    # TODO add in the place where we huffman-decode that we do not get out of the input range
-    # TODO Handle EOB in DC value!!!
+    # In the real code make sure that we do not get out of the input range in the place where we huffman-decode
     def decode_component_in_mcu(self, bit_reader, ac_huffman, dc_huffman, prev_dc_value, comp_id):
         decoded_component_data = np.zeros((8, 8))
 
@@ -252,42 +222,20 @@ class JpegDecoder:
 
         self.decode_ac_for_component_in_mcu(ac_huffman.get_tree(), bit_reader, decoded_component_data)
 
-        # debug_print('Done decoding component')
-        # debug_print(decoded_component_data)
         return decoded_component_data
 
     def _to_rgb(self):
-
-        transformation_matrix = np.matrix(
-            [[1, 0, (2 - 2 * Cred)],
-             [1, (-Cblue / Cgreen) * (2 - 2 * Cblue), (- Cred / Cgreen) * (2 - 2 * Cred)],
-             [1, (2 - 2 * Cblue), 0]])
-
-        #        new_mat = [ for x in self._full_image_ycbcr]
         info_print("Beginning YCbCr -> RGB transformation")
 
-        # TODO fix this
         def inner_ycbcr_to_rgb(x):
             y = x + 128
-            # for i in range(y.shape[0]):
-            #     if not -0.001 <= y[i] <= 255.001:
-            #         print(f"OH noooo!! {y[i]}")
-            y_tag = y  #########
-            # y_tag[1] -= 128
-            # y_tag[2] -= 128
-            r = np.matmul(transformation_matrix, y_tag)
 
-            R = math.floor(y[0] + 1.402 * (1.0 * y[2] - 128.0))
-
-            G = math.floor(y[0] - 0.344136 * (1.0 * y[1] - 128.0) - 0.714136 * (1.0 * y[2] - 128.0))
-
-            B = math.floor(y[0] + 1.772 * (1.0 * y[1] - 128.0))
-
-            # r = np.matmul(transformation_matrix, x) + 128
-            return R, G, B
+            r = math.floor(y[0] + 1.402 * (1.0 * y[2] - 128.0))
+            g = math.floor(y[0] - 0.344136 * (1.0 * y[1] - 128.0) - 0.714136 * (1.0 * y[2] - 128.0))
+            b = math.floor(y[0] + 1.772 * (1.0 * y[1] - 128.0))
+            return r, g, b
 
         self._full_image_rgb = np.apply_along_axis(inner_ycbcr_to_rgb, 2, self._full_image_ycbcr)
-
         info_print("Finished YCbCr -> RGB transformation")
 
     def copy_to_full_image(self, start_row_idx_dst, start_col_idx_dst, dst, comp):
@@ -295,8 +243,6 @@ class JpegDecoder:
                dst.shape[1] + start_col_idx_dst <= self._full_image_ycbcr.shape[1] and 0 <= comp <= 2
         self._full_image_ycbcr[start_row_idx_dst: start_row_idx_dst + dst.shape[0],
         start_col_idx_dst:start_col_idx_dst + dst.shape[1], comp] = dst
-        # for i, j in itertools.product(range(8), range(8)):
-        #     self._full_image_ycbcr[start_row_idx_dst + i, start_col_idx_dst + j, comp] = dst[i, j]
 
     def construct_pixel_map(self, n_mcu_horiz, pixels_mcu_horiz, pixels_mcu_vert):
         info_print("constructing pixel map")
@@ -337,21 +283,3 @@ class JpegDecoder:
                                         Y_INDEX_IN_YCBCR)
 
         info_print("Done constructing pixel map")
-
-
-# DROR I am hurt in my performance muscle
-def print_mat_by_components(mat):
-    for i in range(3):
-        debug_print(mat[:, :, i])
-
-
-def dror(x):
-    return get_rgb_from_ycbcr(*x)
-
-
-def get_rgb_from_ycbcr(y, cb, cr):
-    r = cr * (2 - 2 * Cred) + y
-    b = cb * (2 - 2 * Cblue) + y
-    g = (y - Cblue * b - Cred * r) / Cgreen
-
-    return round(r + 128), round(g + 128), round(b + 128)
