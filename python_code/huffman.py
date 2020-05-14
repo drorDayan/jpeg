@@ -50,9 +50,9 @@ class HuffTree:
         current_level = 1
         while current_level <= 16:
             tree_level_nodes = advance_tree_level(tree_level_nodes)
-            leaves = [n for n in tree_level_nodes if n.is_leaf()]
+            leaves = [n for n in tree_level_nodes if n.is_leaf() and n.get_value() is not None]
             symbols_of_length[current_level] = len(leaves)
-            [symbols_list.append(leaf.get_value()) for leaf in leaves]
+            [symbols_list.append(leaf.get_value()) for leaf in leaves if leaf.get_value() is not None] # in real code, make tree not have None-leaves
             current_level += 1
 
         return symbols_of_length, symbols_list

@@ -8,7 +8,7 @@ class DqtWriter(IWriter):
         super(DqtWriter, self).__init__()
 
     def write(self, jpeg_metadata):
-        output = [0xFF, 0xDb]
+        output = bytearray([0xFF, 0xDb])
         output.append(0)  # SIZE
         output.append(0)
 
@@ -19,12 +19,14 @@ class DqtWriter(IWriter):
         def save_tables(table_getter, table_list):
             tables = []
             for comp_id in comp_ids:
-                comp_table = table_getter()
-                if comp_table not in tables:
+                comp_table = table_getter(comp_id)
+                x = [i for i in range(len(tables)) if (tables[i] == comp_table).all()]
+                if not x:
                     table_list[comp_id] = len(tables)
                     tables.append(comp_table)
                 else:
-                    table_list[comp_id] = tables.index(comp_table)
+                    assert(len(x) == 1)
+                    table_list[comp_id] = x[0]
             return tables
 
         q_ts = save_tables(lambda cid: jpeg_metadata.components_to_metadata[cid].quantization_table,
@@ -36,7 +38,7 @@ class DqtWriter(IWriter):
             q_t_data = q_t_idx
             output.append(q_t_data)
             for i, j in itertools.product(range(8), range(8)):
-                output.append(q_t[i, j])
+                output.append(int(q_t[i, j]))
 
         real_length = len(output) - 2
         output[2:4] = real_length.to_bytes(2, self._endianess)

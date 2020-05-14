@@ -6,4 +6,4 @@ class EoiWriter(IWriter):
         super(EoiWriter, self).__init__()
 
     def write(self, jpeg_metadata):
-        return [0xFF, 0xD9]
+        return bytearray([0xFF, 0xD9])

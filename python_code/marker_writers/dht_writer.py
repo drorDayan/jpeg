@@ -10,7 +10,7 @@ class DhtWriter(IWriter):
         def save_huff_tables(table_getter, table_list):
             tables = []
             for comp_id in comp_ids:
-                comp_table = table_getter()
+                comp_table = table_getter(comp_id)
                 if comp_table not in tables:
                     table_list[comp_id] = len(tables)
                     tables.append(comp_table)
@@ -39,7 +39,7 @@ class DhtWriter(IWriter):
                 num_symbols_of_length, symbols_of_really = tree_thing.poop_to_jpeg()
 
                 for n in num_symbols_of_length:
-                    output.append(n)
+                    output.append(num_symbols_of_length[n])
                 for sym in symbols_of_really:
                     output.append(sym)
 

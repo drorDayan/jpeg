@@ -6,4 +6,4 @@ class SoiWriter(IWriter):
         super(SoiWriter, self).__init__()
 
     def write(self, jpeg_metadata):
-        return [0xFF, 0xD8]
+        return bytearray([0xFF, 0xD8])

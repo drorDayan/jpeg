@@ -7,6 +7,7 @@ import time
 from jpeg_bit_reader import JpegBitReader
 from jpeg_common import *
 from jpeg_encoder import JpegEncoder
+from jpeg_writer import JpegWriter
 
 ENCODING_TEST = True
 
@@ -121,7 +122,7 @@ class JpegDecoder:
     #   4. inverse dct
     #   5. Convert to rgb
     def decode(self):
-
+        info_print("started decoding raw data")
         bit_reader = JpegBitReader(self.raw_data)
         pixels_mcu_horiz = self.jpeg_decode_metadata.horiz_pixels_in_mcu
         pixels_mcu_vert = self.jpeg_decode_metadata.vert_pixels_in_mcu
@@ -135,10 +136,12 @@ class JpegDecoder:
         if ENCODING_TEST:
             encoder = JpegEncoder(self.jpeg_decode_metadata)
             res = encoder.encode(self._decoded_mcu_list)
-
             min_len = min(len(res), len(bit_reader._bytes))
             is_eq = res[:min_len] == bit_reader._bytes[:min_len]
             info_print(f"Equal? {'Yes ☺' if is_eq else 'No!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'}")
+
+            writer = JpegWriter()
+            writer.write(self.jpeg_decode_metadata, res)
         self.de_quantize(self.jpeg_decode_metadata.components_to_metadata)
         info_print("time:", time.time())
 
