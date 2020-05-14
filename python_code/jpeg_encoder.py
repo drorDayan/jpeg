@@ -1,7 +1,7 @@
 import math
 
 from jpeg_bit_writer import JpegBitWriter
-from jpeg_common import zig_zag_index
+from jpeg_common import *
 
 
 class McuToEncode:
@@ -30,8 +30,8 @@ class JpegEncoder:
     def get_bits_from_number(value, num_bits):
         return [((value & (1 << i)) >> i) for i in range(num_bits - 1, -1, -1)]
 
-
-    def table_5_encoding(self, value_to_encode):
+    @staticmethod
+    def table_5_encoding(value_to_encode):
         code = math.ceil(math.log2(math.fabs(value_to_encode) + 1))
 
         if value_to_encode == 0:
@@ -43,7 +43,7 @@ class JpegEncoder:
             base_value = 1 - 2 ** code
             additional_bits_value = value_to_encode - base_value
 
-        additional_bits = self.get_bits_from_number(additional_bits_value, code)
+        additional_bits = JpegEncoder.get_bits_from_number(additional_bits_value, code)
 
         return code, additional_bits
 
@@ -51,7 +51,7 @@ class JpegEncoder:
         diff_dc_value = dc_value - dc_prev_values[comp_id]
         dc_prev_values[comp_id] = dc_value
 
-        dc_code, additional_bits = self.table_5_encoding(diff_dc_value)
+        dc_code, additional_bits = JpegEncoder.table_5_encoding(diff_dc_value)
 
         dc_code_bits = self.huffman_code(comp_id, True, dc_code)
         jpeg_bit_writer.write_bits(dc_code_bits)
@@ -81,7 +81,7 @@ class JpegEncoder:
 
             ac_value = int(sub_mcu[zig_zag_index(encoded_idx)])
 
-            ac_code_size, additional_bits = self.table_5_encoding(ac_value)
+            ac_code_size, additional_bits = JpegEncoder.table_5_encoding(ac_value)
             rle_and_size_byte = (zero_count << 4) + ac_code_size
             ac_code_bits = self.huffman_code(comp_id, False, rle_and_size_byte)
             jpeg_bit_writer.write_bits(ac_code_bits)
@@ -109,7 +109,7 @@ class JpegEncoder:
         for datum_idx in range(len(data)):
             # datum is McuParsedDctComponents
             if datum_idx % 1000 == 0:
-                print(datum_idx)
+                debug_print(datum_idx)
             if self.metadata.restart_interval is not None and datum_idx > 0 and datum_idx % self.metadata.restart_interval == 0:
                 self.emit_rst_marker(jpeg_bit_writer, rst_idx)
                 rst_idx = (rst_idx + 1) % 8
@@ -119,8 +119,8 @@ class JpegEncoder:
             mcu = McuToEncode(datum.raw_mcus)
             self.huffman_encode_mcu(mcu, jpeg_bit_writer, dc_prev_values)
 
-        print(f"Restart interval: {self.metadata.restart_interval}")
-        jpeg_bit_writer.flush()
+        debug_print(f"Restart interval: {self.metadata.restart_interval}")
+        # jpeg_bit_writer.flush()
         return jpeg_bit_writer.get_all_bytes()
 
     @staticmethod

@@ -55,8 +55,3 @@ class HuffTable:
             curr_decoded_val = []
             self._lookup_table = self._tree.get_lookup_table(curr_decoded_val)
         return self._lookup_table
-
-    #drorda
-    # FAST_POW (
-    #     some things i learned in numerica and i do..
-    # )

@@ -1,11 +1,11 @@
 class JpegBitWriter:
     def __init__(self):
-        self._last_byte_is_ff = False  # This is useless I will simply check when I write a byte
         self._data = bytearray()
         self._curr_byte = 0x00
         self._bit_idx = 0
 
     # Writes a bit (0 or 1)
+    # DROR: I don't like this double negative, should be called padding and be defaulted to True
     def write_bit(self, bit_to_write, no_padding=False):
         self._curr_byte = self._curr_byte | bit_to_write << (7 - self._bit_idx)
         self._bit_idx += 1
@@ -33,4 +33,5 @@ class JpegBitWriter:
         self.write_bits(bits_to_write, no_padding)
 
     def get_all_bytes(self):
+        self.flush()
         return self._data
