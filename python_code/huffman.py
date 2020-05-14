@@ -33,6 +33,30 @@ class HuffTree:
             ret_lookup_table = {**ret_lookup_table, **self._successors[i].get_lookup_table(curr_decoded_val+[i])}
         return ret_lookup_table
 
+    def poop_to_jpeg(self):
+        #########################################3
+        #########################################
+        # ASSUMING LEFTMOST TREE!
+        #########################################
+        ##########################################
+
+        tree_level_nodes = [self]
+        symbols_of_length = {i : 0 for i in range(1, 17)}
+        symbols_list = []
+
+        def advance_tree_level(tree_level):
+            return [succ for n in tree_level for succ in n.get_kids()]
+
+        current_level = 1
+        while current_level <= 16:
+            tree_level_nodes = advance_tree_level(tree_level_nodes)
+            leaves = [n for n in tree_level_nodes if n.is_leaf()]
+            symbols_of_length[current_level] = len(leaves)
+            [symbols_list.append(leaf.get_value()) for leaf in leaves]
+            current_level += 1
+
+        return symbols_of_length, symbols_list
+
 
 class HuffTable:
     def __init__(self, table_num, is_dc, tree):
