@@ -1,6 +1,4 @@
-from numpy import unique
-
-from i_writer import IWriter
+from marker_writers.i_writer import IWriter
 
 
 class DhtWriter(IWriter):
@@ -49,9 +47,9 @@ class DhtWriter(IWriter):
         poop_tables(dc_t, 0)
 
         real_length = len(output) - 2
-        output[2:4] = real_length
+        output[2:4] = real_length.to_bytes(2, self._endianess)
 
         return output, comp_ac_tables_indices, comp_dc_tables_indices
 
     def __init__(self):
-        pass
+        super(DhtWriter, self).__init__()

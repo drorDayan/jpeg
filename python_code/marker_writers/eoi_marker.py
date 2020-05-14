@@ -1,9 +1,9 @@
-from i_writer import IWriter
+from marker_writers.i_writer import IWriter
 
 
 class EoiWriter(IWriter):
     def __init__(self):
-        pass
+        super(EoiWriter, self).__init__()
 
     def write(self, jpeg_metadata):
         return [0xFF, 0xD9]

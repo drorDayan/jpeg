@@ -1,11 +1,11 @@
 import itertools
 
-from i_writer import IWriter
+from marker_writers.i_writer import IWriter
 
 
 class DqtWriter(IWriter):
     def __init__(self):
-        pass
+        super(DqtWriter, self).__init__()
 
     def write(self, jpeg_metadata):
         output = [0xFF, 0xDb]
@@ -37,6 +37,9 @@ class DqtWriter(IWriter):
             output.append(q_t_data)
             for i, j in itertools.product(range(8), range(8)):
                 output.append(q_t[i, j])
+
+        real_length = len(output) - 2
+        output[2:4] = real_length.to_bytes(2, self._endianess)
 
         return output, comp_dqt_tables_indices
         # We're not sure what it does, but whatever it does - it works!
