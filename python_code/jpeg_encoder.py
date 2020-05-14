@@ -121,7 +121,7 @@ class JpegEncoder:
 
         print(f"Restart interval: {self.metadata.restart_interval}")
         jpeg_bit_writer.flush()
-        return jpeg_bit_writer.poop_all()
+        return jpeg_bit_writer.get_all_bytes()
 
     @staticmethod
     def emit_rst_marker(jpeg_bit_writer, rst_idx):

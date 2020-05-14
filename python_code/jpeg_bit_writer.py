@@ -30,9 +30,7 @@ class JpegBitWriter:
     def write_byte(self, byte_to_write, no_padding=True):
         bits_to_write = [((byte_to_write & (1 << i)) >> i) for i in reversed(range(8))]
         # print(f"Writing byte {bits_to_write}")
-
-
         self.write_bits(bits_to_write, no_padding)
 
-    def poop_all(self):
+    def get_all_bytes(self):
         return self._data

@@ -99,7 +99,6 @@ class Jpeg:
         #    bmp_writer.write_from_rgb(image_matrix, width=actual_width, height=actual_height)
         info_print("Finished creating BMP!")
 
-
     def decode_raw_data(self, start_idx):
         decoder = JpegDecoder(self._jpg_data[start_idx:], self.jpeg_decode_metadata)
         new_idx, image, actual_width, actual_height = decoder.decode()

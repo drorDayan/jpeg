@@ -171,7 +171,8 @@ class JpegDecoder:
         print("time:", time.time())
 
         self.inverse_dct(self.jpeg_decode_metadata.components_to_metadata.keys())
-
+        # TODO the code up until now is true regardless of the number of components,
+        #  from here and on it is color space dependent and needs to be fixed
         self.construct_pixel_map(n_mcu_horiz, pixels_mcu_horiz, pixels_mcu_vert)
 
         self._to_rgb()
@@ -306,6 +307,7 @@ class JpegDecoder:
 
         for decoded_mcu_idx in range(len(self._decoded_mcu_list)):
             decoded_mcu = self._decoded_mcu_list[decoded_mcu_idx]
+            # TODO the next is true only for YCbCr, this function should be called construct pixel map from YCbCr
             assert all(len(decoded_mcu.mcus_after_idct[i]) == 1 for i in range(2, 4))
 
             mcu_row_idx = (decoded_mcu_idx // n_mcu_horiz)
