@@ -4,6 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 # testing output file
 python_code/bmp_from_jpg.bmp
+python_code/jpg_from_jpg.jpg
 # User-specific files
 *.rsuser
 *.suo
