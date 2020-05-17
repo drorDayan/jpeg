@@ -1,3 +1,4 @@
+# coding=utf-8
 import itertools
 import math
 
@@ -237,7 +238,7 @@ class JpegDecoder:
             g = math.floor(y[0] - 0.344136 * (1.0 * y[1] - 128.0) - 0.714136 * (1.0 * y[2] - 128.0))
             b = math.floor(y[0] + 1.772 * (1.0 * y[1] - 128.0))
             return r, g, b
-
+        # TODO change to uint8 because 02.jpg collapses
         self._full_image_rgb = np.apply_along_axis(inner_ycbcr_to_rgb, 2, self._full_image_ycbcr)
         info_print("Finished YCbCr -> RGB transformation")
 
