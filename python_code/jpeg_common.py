@@ -28,8 +28,6 @@ class ColorSpace(Enum):
     GreyScale = auto()
 
 
-
-
 def zig_zag_index(k):
     # upper side of interval
     return ZIG_ZAG_LOOKUP[k]

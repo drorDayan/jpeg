@@ -12,16 +12,16 @@ class App14Writer(IWriter):
         if color_space is ColorSpace.GreyScale:
             assert num_of_comp == 1
             return bytearray()
-        if color_space is ColorSpace.RGB:
+        elif color_space is ColorSpace.RGB:
             assert num_of_comp == 3
             app_14_color_transform = 0x00
-        if color_space is ColorSpace.YCbCr:
+        elif color_space is ColorSpace.YCbCr:
             assert num_of_comp == 3
             return bytearray()
-        if color_space is ColorSpace.CMYK:
+        elif color_space is ColorSpace.CMYK:
             assert num_of_comp == 4
             app_14_color_transform = 0x00
-        if color_space is ColorSpace.YCCK:
+        elif color_space is ColorSpace.YCCK:
             assert num_of_comp == 4
             app_14_color_transform = 0x02
         assert app_14_color_transform != 0xff, "This means we didn't handle app 14 correctly"
