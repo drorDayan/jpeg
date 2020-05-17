@@ -18,7 +18,7 @@ class JpegWriter:
         out = bytearray()
         out += SoiWriter().write(metadata)
         out += App0Writer().write(metadata)
-        out += App14Writer().write(metadata.color_space)
+        out += App14Writer().write((metadata.color_space, len(metadata.components_to_metadata)))
         out += DriWriter().write(metadata)
         c_out, comp_dqt_tables_indices = DqtWriter().write(metadata)
         out += c_out
