@@ -7,6 +7,8 @@ class DriWriter(IWriter):
         self._DRI_size = 4
 
     def write(self, jpeg_metadata):
+        if jpeg_metadata.restart_interval is None:
+            return bytearray()
         output = bytearray()
         output.append(0xFF)  # DRI marker
         output.append(0xDD)

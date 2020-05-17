@@ -2,13 +2,11 @@ from jpeg import Jpeg
 import time
 
 if __name__ == '__main__':
-    # TODO:
-    # handle DRI
-    # handle APP14
 
     # img_path = r'..\imgs\lennag.JPG'
     # img_path = r'..\imgs\lenna.JPG'
-    img_path = r'..\imgs\cmyk.JPG'
+    # img_path = r'..\imgs\cmyk.JPG'
+    img_path = r'..\imgs\FPEI6055.JPG'
     # # Print num of components for debug
     # data = open(img_path, "rb").read()
     # for i in range(len(data)):
