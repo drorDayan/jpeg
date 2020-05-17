@@ -5,9 +5,8 @@ from marker_parsers.i_parser import IParser
 class App14Parser(IParser):
     def parse(self, jpg, raw_marker):
         info_print("App14 parser started")
-        data = b'\xFF \xee \x00 \x0e'
-        data += raw_marker
-        jpg.add_app14(data)
+        assert(len(raw_marker) == 12)
+        jpg.app_14_color_transform = raw_marker[-1]
         info_print("App14 parser ended successfully")
 
         return True

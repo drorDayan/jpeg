@@ -1,18 +1,37 @@
 from dataclasses import dataclass
-
 from bmp_writer import BmpWriter
-from jpeg_decoder import JpegDecoder
 from jpeg_common import *
+from jpeg_decoder import JpegDecoder
+from marker_parsers.app14_parser import App14Parser
 from marker_parsers.dht_parser import DhtParser, HuffTable
 from marker_parsers.dqt_parser import DqtParser
 from marker_parsers.dri_parser import DriParser
 from marker_parsers.eoi_parser import EoiParser
 from marker_parsers.sof0_parser import Sof0Parser
 from marker_parsers.sos_parser import SosParser
-from marker_parsers.app14_parser import App14Parser
 
 
 # This class is a combination of a Jpeg metadata builder and the main jpeg decoding functionality (Fix in the real code)
+def compute_color_space(num_components, app14_color_transform):
+    if num_components == 1:
+        return ColorSpace.GreyScale
+
+    if num_components == 3:
+        if app14_color_transform is None or app14_color_transform == 0:
+            return ColorSpace.RGB
+        else:
+            assert (app14_color_transform == 1)
+            return ColorSpace.YCbCr
+
+    else:
+        assert (num_components == 4)
+        if app14_color_transform is None or app14_color_transform == 0:
+            return ColorSpace.CMYK
+        else:
+            assert (app14_color_transform == 2)
+            return ColorSpace.YCCK
+
+
 class Jpeg:
     def __init__(self, jpeg_file_path):
         self._ac_huffman_tables = {}
@@ -23,7 +42,7 @@ class Jpeg:
         self._component_id_to_sample_factors = {}
         self._exists_eoi = False
 
-        self._app14 = None
+        self.app14_color_transform = None
         self.restart_interval = None
         self.height = None
         self.width = None
@@ -44,13 +63,12 @@ class Jpeg:
                 0xdd: DriParser,
                 0xee: App14Parser
             }
-
         '''
         .jpg_ignore:
         DRI
         APPn, n>=1
         '''
-        self._markers_to_skip = {i for i in range(0xe0, 0xe0+14)} | {0xfe}
+        self._markers_to_skip = {i for i in range(0xe0, 0xe0 + 14)} | {0xfe}
 
     def parse(self):
         info_print("Started parsing!")
@@ -127,11 +145,6 @@ class Jpeg:
         self._component_id_to_quantization_table_id[component_id] = quantization_table_id
         return True
 
-    def add_app14(self, data):
-        if self._app14 is not None:
-            raise Exception("APP14 already added")
-        self._app14 = data
-
     def add_component_sample_factors(self, component_id, sample_factors):
         if component_id in self._component_id_to_sample_factors:
             raise Exception("error this component_id has a sample_factors assigned to him")
@@ -160,7 +173,8 @@ class Jpeg:
         height: int
         width: int
         components_to_metadata: {}
-        app14_data: None
+        # app14_color_tranform: None
+        color_space: ColorSpace
 
     '''This function collects all data related to specific components into one CONVENIENT data structure
     we need to do this because the metadata of each component is the indexes of tables
@@ -209,6 +223,9 @@ class Jpeg:
         debug_print(
             f"Parsed MCU size: {horiz_pixels_in_mcu} over {vert_pixels_in_mcu} pixels")
 
+        num_components = len(self._component_id_to_quantization_table_id.keys())
+        color_space = compute_color_space(num_components, self.app14_color_transform)
         self.jpeg_decode_metadata = Jpeg.JpegDecodeMetadata(self.restart_interval, horiz_pixels_in_mcu,
                                                             vert_pixels_in_mcu, self.height,
-                                                            self.width, components_to_metadata, self._app14)
+                                                            self.width, components_to_metadata,
+                                                            color_space)
