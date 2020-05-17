@@ -17,11 +17,11 @@ def compute_color_space(num_components, app14_color_transform):
         return ColorSpace.GreyScale
 
     if num_components == 3:
-        if app14_color_transform is None or app14_color_transform == 0:
-            return ColorSpace.RGB
-        else:
-            assert (app14_color_transform == 1)
+        if app14_color_transform is None or app14_color_transform == 1:
             return ColorSpace.YCbCr
+        else:
+            assert app14_color_transform == 0
+            return ColorSpace.RGB
 
     else:
         assert (num_components == 4)
